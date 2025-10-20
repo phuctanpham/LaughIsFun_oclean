@@ -262,6 +262,7 @@
                 width: getHookSize(),
                 height: getHookSize(),
                 speed: 3,
+                maxLength: canvas.height - ship.y - ship.height, // Maximum hook line length
                 attached: null
             };
 
@@ -318,6 +319,13 @@
             if (gameState === 'moving') {
                 hook.x = ship.x;
                 hook.y = ship.y + ship.height;
+                
+                // Hook slowly descends even when not fishing
+                const hookStartY = ship.y + ship.height;
+                const currentLength = hook.y - hookStartY;
+                if (currentLength < hook.maxLength) {
+                    hook.y += 0.5; // Slow automatic descent
+                }
             }
 
             if (gameState === 'fishing') {
@@ -330,16 +338,19 @@
                 if (hook.attached) {
                     hook.attached.x = hook.x - hook.attached.width / 2;
                     hook.attached.y = hook.y + getHookSize();
+                    
+                    // Check if attached trash touches ship
+                    if (checkCollision(hook.attached, ship)) {
+                        score++;
+                        entities = entities.filter(e => e !== hook.attached);
+                        entities.push(createEntity(Math.random() > 0.5 ? 'fish' : 'trash'));
+                        hook.attached = null;
+                        hook.y = ship.y + ship.height;
+                        gameState = 'moving';
+                    }
                 }
 
                 if (hook.y <= ship.y + ship.height) {
-                    if (hook.attached) {
-                        if (checkCollision(hook, ship)) {
-                             score++;
-                             entities = entities.filter(e => e !== hook.attached);
-                             entities.push(createEntity(Math.random() > 0.5 ? 'fish' : 'trash'));
-                        }
-                    }
                     hook.y = ship.y + ship.height;
                     hook.attached = null;
                     gameState = 'moving';
