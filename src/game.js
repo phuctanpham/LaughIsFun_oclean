@@ -68,6 +68,13 @@ let fishImages = [];
 let trashImages = [];
 let currentGuideStep = 1;
 
+// Touch controls
+let lastTap = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+let isTouching = false;
+let touchStartTime = 0;
+
 // Default SVG images
 const DEFAULT_IMAGES = {
     fish: [
@@ -533,9 +540,91 @@ const startGame = () => {
     gameLoop();
 };
 
+// Mobile Touch Controls
+let doubleTapTimeout = null;
+
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    
+    if (gameState === 'idle' || gameState === 'game_over') return;
+    
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    touchStartX = touch.clientX - rect.left;
+    touchStartY = touch.clientY - rect.top;
+    isTouching = true;
+    touchStartTime = Date.now();
+    
+    // Double tap detection for dropping hook
+    const currentTime = Date.now();
+    const tapGap = currentTime - lastTap;
+    
+    if (tapGap < 300 && tapGap > 0) {
+        // Double tap detected - drop hook
+        if (gameState === 'ready') {
+            gameState = 'dropping';
+        }
+        lastTap = 0;
+    } else {
+        lastTap = currentTime;
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    
+    if (!isTouching || gameState === 'idle' || gameState === 'game_over') return;
+    
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const currentX = touch.clientX - rect.left;
+    const currentY = touch.clientY - rect.top;
+    
+    // Swipe detection for moving ship
+    if (gameState === 'ready') {
+        const deltaX = currentX - touchStartX;
+        
+        if (Math.abs(deltaX) > 5) {
+            // Move ship based on swipe direction
+            if (deltaX > 0) {
+                ship.x += ship.speed;
+            } else {
+                ship.x -= ship.speed;
+            }
+            ship.x = Math.max(ship.width / 2, Math.min(canvas.width - ship.width / 2, ship.x));
+            touchStartX = currentX;
+        }
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    
+    isTouching = false;
+    
+    // If touching ended during pulling without attachment, return to dropping
+    if (gameState === 'pulling' && !hook.attached) {
+        gameState = 'dropping';
+    }
+}, { passive: false });
+
+// Continuous touch detection for pulling hook
+setInterval(() => {
+    if (isTouching && (gameState === 'dropping' || gameState === 'pulling')) {
+        const touchDuration = Date.now() - touchStartTime;
+        
+        // If held for more than 300ms, start pulling
+        if (touchDuration > 300) {
+            hookMovingUp = true;
+            gameState = 'pulling';
+        }
+    } else if (!isTouching) {
+        hookMovingUp = false;
+    }
+}, 50);
+
 // Prevent default touch behaviors for mobile
-canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 window.addEventListener('resize', setupCanvas);
 window.addEventListener('keydown', handleInput);
