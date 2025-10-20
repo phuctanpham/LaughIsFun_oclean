@@ -1,0 +1,230 @@
+OCLEAN - Ocean Cleanup Game
+Concept & Development Prompts
+================================
+
+PROJECT OVERVIEW:
+OClean is a web-based fishing game where players clean the ocean by catching trash while avoiding fish. Built as a Progressive Web App (PWA) with offline capabilities.
+
+---
+
+INITIAL CONCEPT PROMPT:
+"Create a fishing game where the player controls a ship that drops a hook to catch items underwater. The goal is to catch trash (bottles, cans) to clean the ocean and avoid catching fish. The game should have:
+- A ship at the top that moves left/right
+- A hook that drops down when player presses a key
+- Fish and trash moving horizontally underwater
+- Score increases when catching trash
+- Game over when catching a fish
+- Progressive difficulty as score increases"
+
+---
+
+GAME MECHANICS PROMPTS:
+
+1. CORE GAMEPLAY:
+"Implement a canvas-based game with:
+- Ship movement: Use A/D or Arrow keys to move left/right
+- Hook dropping: Press S or Down arrow to drop hook
+- Hook pulling: Press W or Up arrow to pull hook back up
+- Collision detection between hook and underwater objects
+- Automatic respawn of objects that go off-screen"
+
+2. DIFFICULTY SCALING:
+"Add progressive difficulty that adjusts based on score:
+- Entity size: Decrease from 60px to 30px as score increases
+- Entity speed: Start at 2.5, decrease to 1.0 as score increases (slower at higher scores for increased challenge)
+- Trash count: Decrease from 10 to 2 as score increases
+- Fish count: Increase from 5 upward as score increases
+- Hook size: Scale proportionally to entity size"
+
+3. VISUAL ASSETS:
+"Create a fallback system for images:
+- Default SVG images embedded in code for ship, hook, fish, and trash
+- Load custom PNG images from /statics/ directory
+- Automatically fall back to SVG if PNG files not found
+- Support multiple fish variations (5 types)
+- Support multiple trash variations (5 types)"
+
+---
+
+TECHNICAL IMPLEMENTATION PROMPTS:
+
+4. PWA FEATURES:
+"Convert the game into a Progressive Web App:
+- Add manifest.json with app name, icons, theme colors
+- Implement service worker for offline caching
+- Add install prompt button for mobile devices
+- Cache all game assets for offline play
+- Set orientation to landscape for optimal gameplay"
+
+5. LOADING SYSTEM:
+"Create a professional loading screen:
+- Show progress bar during asset loading
+- Display count of loaded assets (fish, trash, ship, hook)
+- Show loading messages and errors
+- Smooth transition to login screen after loading
+- Handle image loading failures gracefully with fallbacks"
+
+6. AUTHENTICATION:
+"Add a simple login screen:
+- Username/password input fields
+- Credentials: username='admin', password='root' or '1=1'
+- Show error message for invalid credentials
+- Beautiful gradient design matching game theme
+- Transition to game after successful login"
+
+---
+
+VISUAL DESIGN PROMPTS:
+
+7. COLOR SCHEME:
+"Use an ocean-themed color palette:
+- Sky: Light blue (#87CEEB)
+- Water: Teal (#008080)
+- Gradients: Purple to violet (#667eea to #764ba2)
+- UI Elements: White text with shadows for readability
+- Background: Dark gray (#333) for loading screens"
+
+8. ANIMATIONS & EFFECTS:
+"Add visual polish:
+- Smooth progress bar animations
+- Button hover effects (translateY on hover)
+- Entity flipping when changing direction
+- White rope/line connecting ship to hook
+- Semi-transparent water section
+- Game over overlay with dimmed background"
+
+---
+
+GAMEPLAY ENHANCEMENT PROMPTS:
+
+9. ENTITY BEHAVIOR:
+"Make entities feel alive:
+- Random spawn from left or right side
+- Varied speeds within a range for each entity
+- Automatic respawn with new random properties when off-screen
+- Direction flipping for visual feedback
+- Random image selection from available variants"
+
+10. UI/UX IMPROVEMENTS:
+"Polish the user interface:
+- Clear on-screen instructions for controls
+- Score display in top-left corner
+- Context-aware help text (different for ready/playing states)
+- Centered game over screen with final score
+- Responsive canvas that adapts to window size"
+
+---
+
+FILE STRUCTURE PROMPTS:
+
+11. PROJECT ORGANIZATION:
+"Organize the project with this structure:
+/src/
+  - index.html (main game file)
+  - index.css (styling - currently minimal)
+  - manifest.json (PWA configuration)
+  - service-worker.js (offline caching)
+/statics/
+  - ship.png
+  - hook.png
+  /fishes/
+    - fish1.png through fish5.png
+  /trashes/
+    - trash1.png through trash5.png
+  - icon-192.png (PWA icon)
+  - icon-512.png (PWA icon)"
+
+---
+
+DEBUGGING & OPTIMIZATION PROMPTS:
+
+12. ERROR HANDLING:
+"Implement robust error handling:
+- Check for canvas 2D context support
+- Handle missing image files with fallbacks
+- Log loading progress to console
+- Show user-friendly error messages
+- Gracefully degrade if features unavailable"
+
+13. PERFORMANCE:
+"Optimize game performance:
+- Use requestAnimationFrame for smooth 60fps gameplay
+- Efficient collision detection
+- Minimize canvas redraws
+- Cache loaded images
+- Limit entity count based on score"
+
+---
+
+FUTURE ENHANCEMENT PROMPTS:
+
+14. POTENTIAL ADDITIONS:
+"Consider these features for future versions:
+- Sound effects for catching items
+- Background music toggle
+- High score persistence (using in-memory storage for Claude.ai)
+- Multiple difficulty levels
+- Power-ups (larger hook, slower entities, etc.)
+- Different ocean environments/backgrounds
+- Achievements system
+- Multiplayer leaderboard (would require backend)"
+
+---
+
+TESTING PROMPTS:
+
+15. QUALITY ASSURANCE:
+"Test these scenarios:
+- Images load correctly from /statics/ directory
+- Fallback images display when files missing
+- Game works offline after first load
+- Controls respond correctly (keyboard input)
+- Collision detection is accurate
+- Score increments properly
+- Game over triggers on fish catch
+- Respawn mechanics work correctly
+- PWA installs on mobile devices"
+
+---
+
+DEPLOYMENT PROMPTS:
+
+16. HOSTING & DISTRIBUTION:
+"Deploy the game:
+- Host on static file server (Nginx, Apache, GitHub Pages)
+- Ensure all paths are relative
+- Test PWA install on mobile devices
+- Verify service worker registration
+- Check HTTPS requirement for PWA features
+- Test on multiple browsers (Chrome, Firefox, Safari, Edge)"
+
+---
+
+ACCESSIBILITY PROMPTS:
+
+17. INCLUSIVE DESIGN:
+"Make the game accessible:
+- Keyboard-only controls (no mouse required)
+- Clear visual indicators for game states
+- High contrast text (white on dark backgrounds)
+- Readable font sizes
+- Consider adding screen reader support for UI elements
+- Add colorblind-friendly visual markers"
+
+---
+
+BRAND IDENTITY:
+
+Game Name: OClean (Ocean Clean)
+Tagline: "Clean the Ocean, Save the Fish"
+Theme: Environmental awareness through gameplay
+Icon: 🌊 (Wave emoji)
+Color Identity: Purple-violet gradients with ocean blues
+
+---
+
+END OF CONCEPT PROMPTS
+
+These prompts can be used individually or in combination to regenerate,
+enhance, or modify the OClean game. Each section focuses on a specific
+aspect of the game development process.

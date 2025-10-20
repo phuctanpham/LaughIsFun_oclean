@@ -1,76 +1,107 @@
-const CACHE_NAME = 'oclean';
-
-// List ALL your assets here for offline caching
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './statics/ship.png',
-  './statics/hook.png',
-  './statics/fishes/fish1.png',
-  './statics/fishes/fish2.png',
-  './statics/fishes/fish3.png',
-  './statics/fishes/fish4.png',
-  './statics/fishes/fish5.png',
-  './statics/trashes/trash1.png',
-  './statics/trashes/trash2.png',
-  './statics/trashes/trash3.png',
-  './statics/trashes/trash4.png',
-  './statics/trashes/trash5.png',
-  'https://cdn.tailwindcss.com'
+const CACHE_NAME = 'oclean-v1.0.0';
+const STATIC_ASSETS = [
+    './',
+    './index.html',
+    './index.css',
+    './game.js',
+    './manifest.json',
+    './static/ship.png',
+    './static/hook.png',
+    'https://cdn.tailwindcss.com'
 ];
 
-// Install event - cache all assets
+// Install event - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing...');
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Service Worker: Caching files');
-        return cache.addAll(ASSETS_TO_CACHE);
-      })
-      .then(() => self.skipWaiting())
-      .catch((err) => console.error('Service Worker: Cache failed', err))
-  );
+    console.log('[SW] Installing service worker...');
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then((cache) => {
+                console.log('[SW] Caching static assets');
+                return cache.addAll(STATIC_ASSETS);
+            })
+            .then(() => {
+                console.log('[SW] Static assets cached');
+                return self.skipWaiting();
+            })
+            .catch((err) => console.error('[SW] Cache failed:', err))
+    );
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...');
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('Service Worker: Clearing old cache');
-            return caches.delete(cache);
-          }
+    console.log('[SW] Activating service worker...');
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cache) => {
+                    if (cache !== CACHE_NAME) {
+                        console.log('[SW] Deleting old cache:', cache);
+                        return caches.delete(cache);
+                    }
+                })
+            );
+        }).then(() => {
+            console.log('[SW] Service worker activated');
+            return self.clients.claim();
         })
-      );
-    })
-  );
-  return self.clients.claim();
+    );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - cache-first strategy with dynamic caching
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request)
-          .then((fetchResponse) => {
-            // Cache new resources
-            return caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, fetchResponse.clone());
-                return fetchResponse;
-              });
-          });
-      })
-      .catch(() => {
-        // If both cache and network fail, you could return a fallback page
-        console.log('Service Worker: Fetch failed for', event.request.url);
-      })
-  );
+    const { request } = event;
+    const url = new URL(request.url);
+
+    // Skip caching for non-GET requests
+    if (request.method !== 'GET') {
+        return;
+    }
+
+    // Handle image requests specially
+    if (url.pathname.match(/\.(png|jpg|jpeg|gif|svg)$/)) {
+        event.respondWith(
+            caches.match(request).then((cachedResponse) => {
+                if (cachedResponse) {
+                    return cachedResponse;
+                }
+
+                return fetch(request).then((response) => {
+                    // Only cache successful responses
+                    if (response.status === 200) {
+                        const responseClone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(request, responseClone);
+                        });
+                    }
+                    return response;
+                }).catch(() => {
+                    console.log('[SW] Fetch failed for:', request.url);
+                    // Return a placeholder or continue without the image
+                    return new Response('', { status: 404, statusText: 'Not Found' });
+                });
+            })
+        );
+        return;
+    }
+
+    // Cache-first strategy for other assets
+    event.respondWith(
+        caches.match(request).then((cachedResponse) => {
+            return cachedResponse || fetch(request).then((response) => {
+                return caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(request, response.clone());
+                    return response;
+                });
+            }).catch(() => {
+                console.log('[SW] Fetch failed for:', request.url);
+            });
+        })
+    );
+});
+
+// Message event - for manual cache updates
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
