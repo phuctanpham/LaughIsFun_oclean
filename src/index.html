@@ -438,10 +438,10 @@
                 // Move up when key pressed OR when attached to something
                 hook.y -= hook.speed * 3;
                 
-                // Move attached entity with hook
+                // Move attached entity with hook (ABOVE the hook so it can touch ship)
                 if (hook.attached) {
                     hook.attached.x = hook.x - hook.attached.width / 2;
-                    hook.attached.y = hook.y + getHookSize();
+                    hook.attached.y = hook.y - hook.attached.height; // Position above hook
                 }
                 
                 if (hook.y <= ship.y + ship.height) {
