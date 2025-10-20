@@ -17,7 +17,7 @@
             display: block;
             background-color: #000;
         }
-        #loadingScreen {
+        #loadingScreen, #loginScreen {
             position: absolute;
             top: 0;
             left: 0;
@@ -30,10 +30,10 @@
             align-items: center;
             z-index: 1000;
         }
-        #loadingScreen.hidden {
+        #loadingScreen.hidden, #loginScreen.hidden {
             display: none;
         }
-        .loading-text {
+        .loading-text, .login-title {
             color: white;
             font-size: 32px;
             font-weight: bold;
@@ -68,6 +68,51 @@
             max-width: 400px;
             text-align: center;
         }
+        .login-form {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            width: 300px;
+        }
+        .login-form input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        .login-form input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .login-form button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .login-form button:hover {
+            transform: translateY(-2px);
+        }
+        .login-form button:active {
+            transform: translateY(0);
+        }
+        .login-error {
+            color: #ff6b6b;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center h-screen">
@@ -79,6 +124,17 @@
         <div class="loading-info" id="loadingInfo">Initializing...</div>
         <div class="error-message" id="errorMessage"></div>
     </div>
+
+    <div id="loginScreen" class="hidden">
+        <div class="login-title">🎣 Fishing Game</div>
+        <div class="login-form">
+            <input type="text" id="username" placeholder="Username" autocomplete="username">
+            <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+            <button onclick="handleLogin()">Login</button>
+            <div class="login-error" id="loginError"></div>
+        </div>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
     <script>
         // Register Service Worker for PWA
@@ -93,6 +149,7 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const loadingScreen = document.getElementById('loadingScreen');
+        const loginScreen = document.getElementById('loginScreen');
         const progressBar = document.getElementById('progressBar');
         const loadingInfo = document.getElementById('loadingInfo');
         const errorMessage = document.getElementById('errorMessage');
@@ -102,155 +159,168 @@
         }
 
         let score = 0;
-        let gameState = 'moving';
+        let gameState = 'idle'; // 'idle', 'playing', 'game_over'
+        let hookMovingUp = false;
         let ship, hook, entities;
         let imagesLoaded = false;
         let shipImg, hookImg;
         let fishImages = [];
         let trashImages = [];
 
-        // Image configuration - list all your images here
-        const IMAGE_CONFIG = {
-            ship: 'statics/ship.png',
-            hook: 'statics/hook.png',
-            fishes: [
-                'statics/fishes/fish1.png',
-                'statics/fishes/fish2.png',
-                'statics/fishes/fish3.png',
-                'statics/fishes/fish4.png',
-                'statics/fishes/fish5.png'
-            ],
-            trashes: [
-                'statics/trashes/trash1.png',
-                'statics/trashes/trash2.png',
-                'statics/trashes/trash3.png',
-                'statics/trashes/trash4.png',
-                'statics/trashes/trash5.png'
-            ]
+        // Login handling
+        const handleLogin = () => {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginError = document.getElementById('loginError');
+
+            if (username === 'admin' && (password === 'root' || password === '1=1')) {
+                loginScreen.classList.add('hidden');
+                startGame();
+            } else {
+                loginError.textContent = 'Invalid username or password!';
+            }
+        };
+
+        // Allow Enter key to submit login
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !loginScreen.classList.contains('hidden')) {
+                handleLogin();
+            }
+        });
+
+        // Dynamically load all images from directories
+        const loadImagesFromDirectory = async (directory, imageArray) => {
+            const extensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
+            const promises = [];
+            
+            // Try loading images with various naming patterns
+            for (let i = 1; i <= 50; i++) {
+                for (const ext of extensions) {
+                    const img = new Image();
+                    const promise = new Promise((resolve) => {
+                        img.onload = () => {
+                            imageArray.push(img);
+                            resolve(true);
+                        };
+                        img.onerror = () => resolve(false);
+                    });
+                    img.src = `${directory}/${i}.${ext}`;
+                    promises.push(promise);
+                    
+                    // Also try common naming patterns
+                    const patterns = [`fish${i}`, `trash${i}`, `item${i}`, `img${i}`];
+                    patterns.forEach(pattern => {
+                        const img2 = new Image();
+                        const promise2 = new Promise((resolve) => {
+                            img2.onload = () => {
+                                imageArray.push(img2);
+                                resolve(true);
+                            };
+                            img2.onerror = () => resolve(false);
+                        });
+                        img2.src = `${directory}/${pattern}.${ext}`;
+                        promises.push(promise2);
+                    });
+                }
+            }
+            
+            await Promise.all(promises);
         };
 
         // Load images with progress tracking
         const loadImages = () => {
-            return new Promise((resolve, reject) => {
-                const totalImages = 2 + IMAGE_CONFIG.fishes.length + IMAGE_CONFIG.trashes.length;
+            return new Promise(async (resolve) => {
                 let loadedCount = 0;
-                let failedCount = 0;
 
-                const updateProgress = () => {
-                    const progress = ((loadedCount + failedCount) / totalImages) * 100;
+                const updateProgress = (current, total) => {
+                    const progress = (current / total) * 100;
                     progressBar.style.width = progress + '%';
-                    loadingInfo.textContent = `Loading: ${loadedCount} / ${totalImages} images`;
-                };
-
-                const checkComplete = () => {
-                    if (loadedCount + failedCount === totalImages) {
-                        if (failedCount > 0) {
-                            errorMessage.textContent = `Warning: ${failedCount} image(s) failed to load. Check console for details.`;
-                        }
-                        
-                        if (fishImages.length === 0 || trashImages.length === 0) {
-                            errorMessage.textContent = 'Error: No fish or trash images loaded. Check your statics folder.';
-                        }
-                        
-                        setTimeout(() => {
-                            imagesLoaded = true;
-                            loadingScreen.classList.add('hidden');
-                            resolve();
-                        }, 500);
-                    }
+                    loadingInfo.textContent = `Loading: ${current} / ${total} assets`;
                 };
 
                 // Load ship
                 shipImg = new Image();
-                shipImg.onload = () => {
-                    loadedCount++;
-                    console.log('✓ Loaded: ship.png');
-                    updateProgress();
-                    checkComplete();
-                };
-                shipImg.onerror = () => {
-                    failedCount++;
-                    console.error('✗ Failed to load: ship.png');
-                    updateProgress();
-                    checkComplete();
-                };
-                shipImg.src = IMAGE_CONFIG.ship;
+                const shipPromise = new Promise((res) => {
+                    shipImg.onload = () => {
+                        loadedCount++;
+                        console.log('✓ Loaded: ship.png');
+                        updateProgress(loadedCount, 2);
+                        res();
+                    };
+                    shipImg.onerror = () => {
+                        console.error('✗ Failed to load: ship.png');
+                        loadedCount++;
+                        updateProgress(loadedCount, 2);
+                        res();
+                    };
+                });
+                shipImg.src = 'statics/ship.png';
 
                 // Load hook
                 hookImg = new Image();
-                hookImg.onload = () => {
-                    loadedCount++;
-                    console.log('✓ Loaded: hook.png');
-                    updateProgress();
-                    checkComplete();
-                };
-                hookImg.onerror = () => {
-                    failedCount++;
-                    console.error('✗ Failed to load: hook.png');
-                    updateProgress();
-                    checkComplete();
-                };
-                hookImg.src = IMAGE_CONFIG.hook;
-
-                // Load fish images
-                IMAGE_CONFIG.fishes.forEach((src, index) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        fishImages.push(img);
+                const hookPromise = new Promise((res) => {
+                    hookImg.onload = () => {
                         loadedCount++;
-                        console.log(`✓ Loaded: ${src}`);
-                        updateProgress();
-                        checkComplete();
+                        console.log('✓ Loaded: hook.png');
+                        updateProgress(loadedCount, 2);
+                        res();
                     };
-                    img.onerror = () => {
-                        failedCount++;
-                        console.error(`✗ Failed to load: ${src}`);
-                        updateProgress();
-                        checkComplete();
-                    };
-                    img.src = src;
-                });
-
-                // Load trash images
-                IMAGE_CONFIG.trashes.forEach((src, index) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        trashImages.push(img);
+                    hookImg.onerror = () => {
+                        console.error('✗ Failed to load: hook.png');
                         loadedCount++;
-                        console.log(`✓ Loaded: ${src}`);
-                        updateProgress();
-                        checkComplete();
+                        updateProgress(loadedCount, 2);
+                        res();
                     };
-                    img.onerror = () => {
-                        failedCount++;
-                        console.error(`✗ Failed to load: ${src}`);
-                        updateProgress();
-                        checkComplete();
-                    };
-                    img.src = src;
                 });
+                hookImg.src = 'statics/hook.png';
+
+                await Promise.all([shipPromise, hookPromise]);
+
+                // Load fish and trash images
+                loadingInfo.textContent = 'Discovering fish images...';
+                await loadImagesFromDirectory('statics/fishes', fishImages);
+                
+                loadingInfo.textContent = 'Discovering trash images...';
+                await loadImagesFromDirectory('statics/trashes', trashImages);
+
+                console.log(`Loaded ${fishImages.length} fish images`);
+                console.log(`Loaded ${trashImages.length} trash images`);
+
+                if (fishImages.length === 0 || trashImages.length === 0) {
+                    errorMessage.textContent = `Warning: Found ${fishImages.length} fish and ${trashImages.length} trash images.`;
+                }
+
+                progressBar.style.width = '100%';
+                loadingInfo.textContent = `Ready! ${fishImages.length} fish, ${trashImages.length} trash`;
+
+                setTimeout(() => {
+                    imagesLoaded = true;
+                    loadingScreen.classList.add('hidden');
+                    loginScreen.classList.remove('hidden');
+                    resolve();
+                }, 500);
             });
         };
 
         const setupCanvas = () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            if (!entities || entities.length === 0) {
-                resetGame();
-            }
         };
 
-        const getEntitySize = () => 60; // Fixed size for fish and trash
-        const getHookSize = () => 24; // Hook is 40% of entity size (60 * 0.4 = 24)
-        const getEntitySpeed = () => 2 + score * 0.2;
+        const getEntitySize = () => Math.max(30, 60 - score * 2); // Smaller as score increases
+        const getHookSize = () => getEntitySize() * 0.4;
+        const getEntitySpeed = () => 2 + score * 0.3; // Faster as score increases
+        const getTrashCount = () => Math.max(2, 10 - score); // Less trash as score increases
+        const getFishCount = () => 5 + score; // More fish as score increases
 
         const resetGame = () => {
             score = 0;
-            gameState = 'moving';
+            gameState = 'playing';
+            hookMovingUp = false;
 
             ship = {
                 x: canvas.width / 2,
-                y: canvas.height * 0.4 - 20, // Position ship at bottom of sky area
+                y: canvas.height * 0.4 - 20,
                 width: 80,
                 height: 40,
                 speed: 5
@@ -258,18 +328,37 @@
 
             hook = {
                 x: ship.x,
-                y: ship.y + ship.height, // Start hook at bottom of ship
+                y: ship.y + ship.height,
                 width: getHookSize(),
                 height: getHookSize(),
-                speed: 3,
-                maxLength: canvas.height - ship.y - ship.height, // Maximum hook line length
-                attached: null
+                speed: 1.5
             };
 
             entities = [];
-            for (let i = 0; i < 5; i++) {
-                entities.push(createEntity('fish'));
+            updateEntities();
+        };
+
+        const updateEntities = () => {
+            const trashCount = getTrashCount();
+            const fishCount = getFishCount();
+            
+            // Remove excess or add entities
+            entities = entities.filter(e => {
+                if (e.type === 'trash') {
+                    return entities.filter(en => en.type === 'trash').indexOf(e) < trashCount;
+                } else {
+                    return entities.filter(en => en.type === 'fish').indexOf(e) < fishCount;
+                }
+            });
+
+            const currentTrash = entities.filter(e => e.type === 'trash').length;
+            const currentFish = entities.filter(e => e.type === 'fish').length;
+
+            for (let i = currentTrash; i < trashCount; i++) {
                 entities.push(createEntity('trash'));
+            }
+            for (let i = currentFish; i < fishCount; i++) {
+                entities.push(createEntity('fish'));
             }
         };
 
@@ -290,19 +379,24 @@
         };
 
         const handleInput = (e) => {
-            if (gameState === 'moving') {
+            if (gameState === 'playing') {
                 if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
                     ship.x -= ship.speed;
                 } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
                     ship.x += ship.speed;
-                } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
-                    gameState = 'fishing';
+                } else if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
+                    hookMovingUp = true;
                 }
                 ship.x = Math.max(ship.width / 2, Math.min(canvas.width - ship.width / 2, ship.x));
             }
             if (gameState === 'game_over' && e.key === 'Enter') {
                 resetGame();
-                gameLoop();
+            }
+        };
+
+        const handleKeyUp = (e) => {
+            if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
+                hookMovingUp = false;
             }
         };
 
@@ -314,66 +408,69 @@
         };
 
         const update = () => {
-            if (gameState === 'game_over') return;
+            if (gameState !== 'playing') return;
 
-            if (gameState === 'moving') {
-                hook.x = ship.x;
-                hook.y = ship.y + ship.height;
-                
-                // Hook slowly descends even when not fishing
-                const hookStartY = ship.y + ship.height;
-                const currentLength = hook.y - hookStartY;
-                if (currentLength < hook.maxLength) {
-                    hook.y += 0.5; // Slow automatic descent
-                }
-            }
+            // Hook follows ship horizontally
+            hook.x = ship.x;
 
-            if (gameState === 'fishing') {
-                hook.y += hook.speed;
-                if (hook.y > canvas.height) {
-                    gameState = 'hooked_up';
-                }
-            } else if (gameState === 'hooked_up') {
-                hook.y -= hook.speed * 2;
-                if (hook.attached) {
-                    hook.attached.x = hook.x - hook.attached.width / 2;
-                    hook.attached.y = hook.y + getHookSize();
-                    
-                    // Check if attached trash touches ship
-                    if (checkCollision(hook.attached, ship)) {
-                        score++;
-                        entities = entities.filter(e => e !== hook.attached);
-                        entities.push(createEntity(Math.random() > 0.5 ? 'fish' : 'trash'));
-                        hook.attached = null;
-                        hook.y = ship.y + ship.height;
-                        gameState = 'moving';
-                    }
-                }
-
+            // Hook movement
+            if (hookMovingUp) {
+                hook.y -= hook.speed * 3; // Move up faster
                 if (hook.y <= ship.y + ship.height) {
                     hook.y = ship.y + ship.height;
-                    hook.attached = null;
-                    gameState = 'moving';
+                }
+            } else {
+                // Always falling down slowly
+                hook.y += hook.speed;
+                if (hook.y > canvas.height) {
+                    hook.y = canvas.height;
                 }
             }
 
+            // Entity movement
             entities.forEach(entity => {
                 entity.x += entity.speed * entity.direction;
                 if (entity.x <= 0 || entity.x + entity.width >= canvas.width) {
                     entity.direction *= -1;
                 }
+                
+                // Update entity size based on score
+                const newSize = getEntitySize();
+                entity.width = newSize;
+                entity.height = newSize;
+                entity.speed = (Math.random() * 0.5 + 0.5) * getEntitySpeed();
             });
 
-            if (gameState === 'fishing') {
-                for (const entity of entities) {
-                    if (checkCollision(hook, entity)) {
-                        if (entity.type === 'fish') {
-                            gameState = 'game_over';
-                        } else {
-                            gameState = 'hooked_up';
-                            hook.attached = entity;
-                        }
-                        break;
+            // Check collisions with ship
+            for (let i = entities.length - 1; i >= 0; i--) {
+                const entity = entities[i];
+                if (checkCollision(entity, ship)) {
+                    if (entity.type === 'trash') {
+                        // Trash touched ship - score increases
+                        score++;
+                        entities.splice(i, 1);
+                        updateEntities();
+                    } else if (entity.type === 'fish') {
+                        // Fish touched ship - game over
+                        gameState = 'game_over';
+                        return;
+                    }
+                }
+            }
+
+            // Check collisions with hook
+            for (let i = entities.length - 1; i >= 0; i--) {
+                const entity = entities[i];
+                if (checkCollision(hook, entity)) {
+                    if (entity.type === 'trash') {
+                        // Hook caught trash - remove it
+                        score++;
+                        entities.splice(i, 1);
+                        updateEntities();
+                    } else if (entity.type === 'fish') {
+                        // Hook caught fish - game over
+                        gameState = 'game_over';
+                        return;
                     }
                 }
             }
@@ -381,12 +478,14 @@
 
         const draw = () => {
             // Background
-            ctx.fillStyle = '#87CEEB'; // Sky
+            ctx.fillStyle = '#87CEEB';
             ctx.fillRect(0, 0, canvas.width, canvas.height * 0.4);
-            ctx.fillStyle = '#008080'; // Ocean
+            ctx.fillStyle = '#008080';
             ctx.fillRect(0, canvas.height * 0.4, canvas.width, canvas.height * 0.6);
 
-            // Hook line (draw before ship so it appears behind)
+            if (gameState === 'idle') return;
+
+            // Hook line
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -394,30 +493,21 @@
             ctx.lineTo(hook.x, hook.y);
             ctx.stroke();
 
-            // Ship (positioned at bottom of sky)
+            // Ship
             if (shipImg.complete && shipImg.naturalHeight !== 0) {
                 ctx.drawImage(shipImg, ship.x - ship.width / 2, ship.y - ship.height / 2, ship.width, ship.height);
             } else {
-                // Fallback ship
                 ctx.fillStyle = '#A52A2A';
                 ctx.fillRect(ship.x - ship.width / 2, ship.y - ship.height / 2, ship.width, ship.height);
-                // Draw simple boat shape
-                ctx.fillStyle = '#8B4513';
-                ctx.beginPath();
-                ctx.moveTo(ship.x - 30, ship.y);
-                ctx.lineTo(ship.x + 30, ship.y);
-                ctx.lineTo(ship.x + 20, ship.y + 20);
-                ctx.lineTo(ship.x - 20, ship.y + 20);
-                ctx.closePath();
-                ctx.fill();
             }
 
             // Hook
             const hookSize = getHookSize();
+            hook.width = hookSize;
+            hook.height = hookSize;
             if (hookImg.complete && hookImg.naturalHeight !== 0) {
                 ctx.drawImage(hookImg, hook.x - hookSize / 2, hook.y - hookSize / 2, hookSize, hookSize);
             } else {
-                // Fallback hook
                 ctx.fillStyle = '#C0C0C0';
                 ctx.beginPath();
                 ctx.arc(hook.x, hook.y, hookSize / 2, 0, Math.PI * 2);
@@ -425,29 +515,23 @@
             }
 
             // Entities
-            const entitySize = getEntitySize();
             entities.forEach(entity => {
-                entity.width = entitySize;
-                entity.height = entitySize;
-                
                 const img = entity.type === 'fish' ? fishImages[entity.imageIndex] : trashImages[entity.imageIndex];
                 if (img && img.complete && img.naturalHeight !== 0) {
-                    ctx.drawImage(img, entity.x, entity.y, entitySize, entitySize);
+                    ctx.drawImage(img, entity.x, entity.y, entity.width, entity.height);
                 } else {
-                    // Fallback shapes
                     ctx.fillStyle = entity.type === 'fish' ? '#FF6347' : '#808080';
-                    ctx.fillRect(entity.x, entity.y, entitySize, entitySize);
+                    ctx.fillRect(entity.x, entity.y, entity.width, entity.height);
                 }
             });
 
-            // Score
+            // Score and instructions
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 24px Arial';
             ctx.fillText(`Score: ${score}`, 10, 30);
 
-            // Instructions
             ctx.font = '14px Arial';
-            ctx.fillText('A/D or ← → to move | S or ↓ to fish | Avoid fish, catch trash!', 10, canvas.height - 10);
+            ctx.fillText('A/D or ← → to move | W or ↑ to pull up hook | Catch trash, avoid fish!', 10, canvas.height - 10);
 
             if (gameState === 'game_over') {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -466,19 +550,21 @@
         const gameLoop = () => {
             update();
             draw();
-            if (gameState !== 'game_over') {
-                requestAnimationFrame(gameLoop);
-            }
+            requestAnimationFrame(gameLoop);
+        };
+
+        const startGame = () => {
+            setupCanvas();
+            resetGame();
+            gameLoop();
         };
 
         window.addEventListener('resize', setupCanvas);
         window.addEventListener('keydown', handleInput);
+        window.addEventListener('keyup', handleKeyUp);
 
         // Initialize game with loading screen
-        loadImages().then(() => {
-            setupCanvas();
-            gameLoop();
-        });
+        loadImages();
     </script>
 </body>
 </html>
