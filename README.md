@@ -4,6 +4,7 @@ vibe code using LLMs to design and develop a web-based game that highlights and 
 A game is published by LaughIsFun
 
 https://oclean.pages.dev/
+<<<<<<< HEAD
 acc: admin
 pwd: root
 
@@ -49,3 +50,5 @@ Service worker with update detection
 Offline support
 Landscape orientation optimized
 Proper theme colors
+=======
+>>>>>>> d4820726d0521fc1e8c9d98ac57d69a3ff3fd013

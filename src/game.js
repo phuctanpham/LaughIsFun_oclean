@@ -85,10 +85,10 @@ const DEFAULT_IMAGES = {
 
 // Image Configuration
 const IMAGE_CONFIG = {
-    ship: 'static/ship.png',
-    hook: 'static/hook.png',
-    fishesPath: 'static/fishes/fish',
-    trashesPath: 'static/trashes/trash',
+    ship: 'statics/ship.png',
+    hook: 'statics/hook.png',
+    fishesPath: 'statics/fishes/fish',
+    trashesPath: 'statics/trashes/trash',
     maxAttempts: 50
 };
 

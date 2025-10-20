@@ -5,8 +5,8 @@ const STATIC_ASSETS = [
     './index.css',
     './game.js',
     './manifest.json',
-    './static/ship.png',
-    './static/hook.png',
+    './statics/ship.png',
+    './statics/hook.png',
     'https://cdn.tailwindcss.com'
 ];
 
