@@ -159,7 +159,7 @@
         }
 
         let score = 0;
-        let gameState = 'idle'; // 'idle', 'playing', 'game_over'
+        let gameState = 'idle'; // 'idle', 'ready', 'dropping', 'pulling', 'game_over'
         let hookMovingUp = false;
         let ship, hook, entities;
         let imagesLoaded = false;
@@ -334,7 +334,7 @@
 
         const resetGame = () => {
             score = 0;
-            gameState = 'playing';
+            gameState = 'ready'; // Start in ready state
             hookMovingUp = false;
 
             ship = {
@@ -399,16 +399,29 @@
         };
 
         const handleInput = (e) => {
-            if (gameState === 'playing') {
-                if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
-                    ship.x -= ship.speed;
-                } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
-                    ship.x += ship.speed;
-                } else if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
-                    hookMovingUp = true;
+            if (gameState === 'ready' || gameState === 'dropping' || gameState === 'pulling') {
+                // Ship movement (only in ready state)
+                if (gameState === 'ready') {
+                    if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+                        ship.x -= ship.speed;
+                    } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+                        ship.x += ship.speed;
+                    }
+                    ship.x = Math.max(ship.width / 2, Math.min(canvas.width - ship.width / 2, ship.x));
                 }
-                ship.x = Math.max(ship.width / 2, Math.min(canvas.width - ship.width / 2, ship.x));
+                
+                // Start dropping hook
+                if (gameState === 'ready' && (e.key === 'ArrowDown' || e.key.toLowerCase() === 's')) {
+                    gameState = 'dropping';
+                }
+                
+                // Pull hook up
+                if ((gameState === 'dropping' || gameState === 'pulling') && (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w')) {
+                    hookMovingUp = true;
+                    gameState = 'pulling';
+                }
             }
+            
             if (gameState === 'game_over' && e.key === 'Enter') {
                 resetGame();
             }
@@ -417,6 +430,10 @@
         const handleKeyUp = (e) => {
             if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
                 hookMovingUp = false;
+                // If hook is not attached and was pulling, go back to dropping
+                if (gameState === 'pulling' && !hook.attached) {
+                    gameState = 'dropping';
+                }
             }
         };
 
@@ -428,14 +445,31 @@
         };
 
         const update = () => {
-            if (gameState !== 'playing') return;
+            if (gameState === 'idle' || gameState === 'game_over') return;
 
-            // Hook follows ship horizontally
-            hook.x = ship.x;
+            // In ready state: hook stays with ship
+            if (gameState === 'ready') {
+                hook.x = ship.x;
+                hook.y = ship.y + ship.height;
+                
+                // Update entity movement
+                entities.forEach(entity => {
+                    entity.x += entity.speed * entity.direction;
+                    if (entity.x <= 0 || entity.x + entity.width >= canvas.width) {
+                        entity.direction *= -1;
+                    }
+                });
+                return;
+            }
+
+            // Hook follows ship horizontally only in ready state
+            if (gameState === 'ready') {
+                hook.x = ship.x;
+            }
 
             // Hook movement
-            if (hookMovingUp || hook.attached) {
-                // Move up when key pressed OR when attached to something
+            if (gameState === 'pulling' || (gameState === 'pulling' && hook.attached)) {
+                // Move up when pulling or when attached to something
                 hook.y -= hook.speed * 3;
                 
                 // Move attached entity with hook (ABOVE the hook so it can touch ship)
@@ -444,11 +478,18 @@
                     hook.attached.y = hook.y - hook.attached.height; // Position above hook
                 }
                 
+                // When hook reaches ship
                 if (hook.y <= ship.y + ship.height) {
                     hook.y = ship.y + ship.height;
+                    
+                    // If nothing attached, go back to ready state
+                    if (!hook.attached) {
+                        gameState = 'ready';
+                        hookMovingUp = false;
+                    }
                 }
-            } else {
-                // Always falling down slowly when not attached
+            } else if (gameState === 'dropping') {
+                // Always falling down when in dropping state
                 hook.y += hook.speed;
                 if (hook.y > canvas.height) {
                     hook.y = canvas.height;
@@ -480,6 +521,8 @@
                         score++;
                         entities = entities.filter(e => e !== hook.attached);
                         hook.attached = null;
+                        gameState = 'ready'; // Back to ready state
+                        hookMovingUp = false;
                         updateEntities();
                     } else if (hook.attached.type === 'fish') {
                         // Fish touched ship - game over
@@ -490,11 +533,12 @@
             }
 
             // Check collisions with hook (only if not already attached)
-            if (!hook.attached) {
+            if (!hook.attached && (gameState === 'dropping' || gameState === 'pulling')) {
                 for (const entity of entities) {
                     if (checkCollision(hook, entity)) {
-                        // Hook catches the entity - attach it
+                        // Hook catches the entity - attach it and start pulling
                         hook.attached = entity;
+                        gameState = 'pulling';
                         break;
                     }
                 }
@@ -556,7 +600,11 @@
             ctx.fillText(`Score: ${score}`, 10, 30);
 
             ctx.font = '14px Arial';
-            ctx.fillText('A/D or ← → to move | W or ↑ to pull up hook | Catch trash, avoid fish!', 10, canvas.height - 10);
+            if (gameState === 'ready') {
+                ctx.fillText('A/D or ← → to move | S or ↓ to drop hook', 10, canvas.height - 10);
+            } else {
+                ctx.fillText('W or ↑ to pull up hook | Catch trash, avoid fish!', 10, canvas.height - 10);
+            }
 
             if (gameState === 'game_over') {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
