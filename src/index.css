@@ -1,17 +1,30 @@
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
 body {
     margin: 0;
+    padding: 0;
     overflow: hidden;
     background-color: #333;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
 }
 
 canvas {
     display: block;
     background-color: #000;
+    touch-action: none;
 }
 
-#loadingScreen, #loginScreen {
-    position: absolute;
+#loadingScreen, #menuScreen, #guideScreen {
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
@@ -24,16 +37,121 @@ canvas {
     z-index: 1000;
 }
 
-#loadingScreen.hidden, #loginScreen.hidden {
+#loadingScreen.hidden, #menuScreen.hidden, #guideScreen.hidden {
     display: none;
 }
 
-.loading-text, .login-title {
+.loading-text, .menu-title {
     color: white;
-    font-size: 32px;
+    font-size: 48px;
     font-weight: bold;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+.menu-subtitle {
+    color: rgba(255,255,255,0.9);
+    font-size: 18px;
+    margin-bottom: 40px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.menu-btn {
+    background: white;
+    color: #667eea;
+    border: none;
+    padding: 15px 40px;
+    border-radius: 12px;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    min-width: 250px;
+}
+
+.menu-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+
+.menu-btn:active {
+    transform: translateY(0);
+}
+
+#guideScreen {
+    background: rgba(0, 0, 0, 0.95);
+}
+
+.guide-content {
+    max-width: 600px;
+    width: 90%;
+    padding: 20px;
+}
+
+.guide-step {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.guide-step h2 {
+    color: #667eea;
+    font-size: 32px;
+    margin: 0 0 20px 0;
+}
+
+.guide-step p {
+    color: #333;
+    font-size: 18px;
+    line-height: 1.6;
+    margin: 10px 0;
+}
+
+.guide-visual {
+    margin: 30px 0;
+    font-size: 20px;
+}
+
+kbd {
+    background: #667eea;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+    display: inline-block;
+    margin: 5px;
+}
+
+.guide-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 15px 40px;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: transform 0.2s;
+}
+
+.guide-btn:hover {
+    transform: translateY(-2px);
+}
+
+.guide-btn:active {
+    transform: translateY(0);
 }
 
 .progress-bar-container {
@@ -68,59 +186,6 @@ canvas {
     text-align: center;
 }
 
-.login-form {
-    background: white;
-    padding: 40px;
-    border-radius: 15px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    width: 300px;
-}
-
-.login-form input {
-    width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    border: 2px solid #ddd;
-    border-radius: 8px;
-    font-size: 16px;
-    box-sizing: border-box;
-    transition: border-color 0.3s;
-}
-
-.login-form input:focus {
-    outline: none;
-    border-color: #667eea;
-}
-
-.login-form button {
-    width: 100%;
-    padding: 12px;
-    margin-top: 10px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.login-form button:hover {
-    transform: translateY(-2px);
-}
-
-.login-form button:active {
-    transform: translateY(0);
-}
-
-.login-error {
-    color: #ff6b6b;
-    font-size: 14px;
-    margin-top: 10px;
-    text-align: center;
-}
-
 #installButton {
     position: fixed;
     top: 20px;
@@ -146,36 +211,30 @@ canvas {
 #installButton.show {
     display: block;
 }
-*/
 
-<!-- ============================================ -->
-<!-- manifest.json -->
-<!-- ============================================ -->
-/*
-{
-    "name": "OClean - Ocean Cleanup Game",
-    "short_name": "OClean",
-    "description": "An offline fishing game where you catch trash and avoid fish to clean the ocean",
-    "start_url": "./index.html",
-    "display": "standalone",
-    "background_color": "#667eea",
-    "theme_color": "#667eea",
-    "orientation": "landscape",
-    "scope": "/",
-    "icons": [
-        {
-            "src": "statics/hook.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any maskable"
-        },
-        {
-            "src": "statics/hook.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any maskable"
-        }
-    ],
-    "categories": ["games", "entertainment"],
-    "screenshots": []
+@media (max-width: 768px) {
+    .loading-text, .menu-title {
+        font-size: 36px;
+    }
+    
+    .menu-subtitle {
+        font-size: 16px;
+    }
+    
+    .menu-btn {
+        min-width: 200px;
+        font-size: 18px;
+    }
+    
+    .guide-step {
+        padding: 30px 20px;
+    }
+    
+    .guide-step h2 {
+        font-size: 24px;
+    }
+    
+    .guide-step p {
+        font-size: 16px;
+    }
 }

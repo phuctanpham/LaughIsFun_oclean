@@ -35,7 +35,6 @@ if ('serviceWorker' in navigator) {
             .then(reg => {
                 console.log('[PWA] Service Worker registered:', reg.scope);
                 
-                // Check for updates
                 reg.addEventListener('updatefound', () => {
                     const newWorker = reg.installing;
                     newWorker.addEventListener('statechange', () => {
@@ -53,7 +52,8 @@ if ('serviceWorker' in navigator) {
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const loadingScreen = document.getElementById('loadingScreen');
-const loginScreen = document.getElementById('loginScreen');
+const menuScreen = document.getElementById('menuScreen');
+const guideScreen = document.getElementById('guideScreen');
 const progressBar = document.getElementById('progressBar');
 const loadingInfo = document.getElementById('loadingInfo');
 const errorMessage = document.getElementById('errorMessage');
@@ -66,6 +66,7 @@ let imagesLoaded = false;
 let shipImg, hookImg;
 let fishImages = [];
 let trashImages = [];
+let currentGuideStep = 1;
 
 // Default SVG images
 const DEFAULT_IMAGES = {
@@ -92,25 +93,28 @@ const IMAGE_CONFIG = {
     maxAttempts: 50
 };
 
-// Login Handler
-const handleLogin = () => {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const loginError = document.getElementById('loginError');
+// Guide Functions
+function showGuide() {
+    menuScreen.classList.add('hidden');
+    guideScreen.classList.remove('hidden');
+    currentGuideStep = 1;
+}
 
-    if (username === 'admin' && (password === 'root' || password === '1=1')) {
-        loginScreen.classList.add('hidden');
-        startGame();
-    } else {
-        loginError.textContent = 'Invalid username or password!';
-    }
-};
+function nextGuideStep(step) {
+    document.getElementById('guideStep' + currentGuideStep).classList.add('hidden');
+    document.getElementById('guideStep' + step).classList.remove('hidden');
+    currentGuideStep = step;
+}
 
-document.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !loginScreen.classList.contains('hidden')) {
-        handleLogin();
-    }
-});
+function closeGuide() {
+    guideScreen.classList.add('hidden');
+    startGame();
+}
+
+function startGameFromMenu() {
+    menuScreen.classList.add('hidden');
+    startGame();
+}
 
 // Image Loading Functions
 const loadImageWithFallback = (src, fallbackSrc, imageName) => {
@@ -212,7 +216,7 @@ const loadImages = () => {
         setTimeout(() => {
             imagesLoaded = true;
             loadingScreen.classList.add('hidden');
-            loginScreen.classList.remove('hidden');
+            menuScreen.classList.remove('hidden');
             resolve();
         }, 500);
     });
@@ -222,11 +226,20 @@ const loadImages = () => {
 const setupCanvas = () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    
+    // Reposition ship if game is active
+    if (ship && gameState !== 'idle') {
+        ship.y = canvas.height * 0.4 - 20;
+        if (gameState === 'ready') {
+            hook.y = ship.y + ship.height;
+        }
+    }
 };
 
 const getEntitySize = () => Math.max(30, 60 - score * 2);
 const getHookSize = () => getEntitySize() * 0.4;
-const getEntitySpeed = () => Math.max(1, 2.5 - score * 0.15);
+// REDUCED initial speed, increases with score
+const getEntitySpeed = () => Math.max(0.5, 1 + score * 0.2);
 const getTrashCount = () => Math.max(2, 10 - score);
 const getFishCount = () => 5 + score;
 
@@ -292,7 +305,7 @@ const createEntity = (type) => {
         x, y,
         width: size,
         height: size,
-        speed: (Math.random() * 0.5 + 0.75) * getEntitySpeed(),
+        speed: (Math.random() * 0.3 + 0.7) * getEntitySpeed(),
         direction,
         type,
         imageIndex
@@ -356,7 +369,7 @@ const update = () => {
                 const newDirection = Math.random() > 0.5 ? 1 : -1;
                 entity.x = newDirection === 1 ? -entity.width : canvas.width + entity.width;
                 entity.direction = newDirection;
-                entity.speed = (Math.random() * 0.5 + 0.75) * getEntitySpeed();
+                entity.speed = (Math.random() * 0.3 + 0.7) * getEntitySpeed();
                 const imageArray = entity.type === 'fish' ? fishImages : trashImages;
                 entity.imageIndex = Math.floor(Math.random() * imageArray.length);
             }
@@ -365,7 +378,8 @@ const update = () => {
     }
 
     if (gameState === 'pulling') {
-        hook.y -= hook.speed * 3;
+        // REDUCED pull speed to match drop speed
+        hook.y -= hook.speed;
         
         if (hook.attached) {
             hook.attached.x = hook.x - hook.attached.width / 2;
@@ -396,7 +410,7 @@ const update = () => {
             const newDirection = Math.random() > 0.5 ? 1 : -1;
             entity.x = newDirection === 1 ? -entity.width : canvas.width + entity.width;
             entity.direction = newDirection;
-            entity.speed = (Math.random() * 0.5 + 0.75) * getEntitySpeed();
+            entity.speed = (Math.random() * 0.3 + 0.7) * getEntitySpeed();
             const imageArray = entity.type === 'fish' ? fishImages : trashImages;
             entity.imageIndex = Math.floor(Math.random() * imageArray.length);
         }
@@ -456,18 +470,27 @@ const draw = () => {
         const img = entity.type === 'fish' ? fishImages[entity.imageIndex] : trashImages[entity.imageIndex];
         
         ctx.save();
+        ctx.translate(entity.x + entity.width / 2, entity.y + entity.height / 2);
         
-        if (entity.direction === -1) {
-            ctx.translate(entity.x + entity.width, entity.y);
-            ctx.scale(-1, 1);
-            
-            if (img && img.complete && img.naturalHeight !== 0) {
-                ctx.drawImage(img, 0, 0, entity.width, entity.height);
+        // Trash tilted at 30 degrees
+        if (entity.type === 'trash') {
+            ctx.rotate(30 * Math.PI / 180);
+        }
+        
+        // Fish swim in opposite direction of image (flip horizontally)
+        if (entity.type === 'fish') {
+            if (entity.direction === 1) {
+                ctx.scale(-1, 1);
             }
         } else {
-            if (img && img.complete && img.naturalHeight !== 0) {
-                ctx.drawImage(img, entity.x, entity.y, entity.width, entity.height);
+            // Trash moves normally (not flipped)
+            if (entity.direction === -1) {
+                ctx.scale(-1, 1);
             }
+        }
+        
+        if (img && img.complete && img.naturalHeight !== 0) {
+            ctx.drawImage(img, -entity.width / 2, -entity.height / 2, entity.width, entity.height);
         }
         
         ctx.restore();
@@ -510,8 +533,17 @@ const startGame = () => {
     gameLoop();
 };
 
+// Prevent default touch behaviors for mobile
+canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
 window.addEventListener('resize', setupCanvas);
 window.addEventListener('keydown', handleInput);
 window.addEventListener('keyup', handleKeyUp);
+
+// Prevent scrolling on mobile
+document.body.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+}, { passive: false });
 
 loadImages();

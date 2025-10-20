@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>OClean - Ocean Cleanup Game</title>
     <meta name="description" content="Clean the ocean by catching trash and avoiding fish!">
     <link rel="manifest" href="manifest.json">
@@ -26,13 +26,62 @@
         <div class="error-message" id="errorMessage"></div>
     </div>
 
-    <div id="loginScreen" class="hidden">
-        <div class="login-title">🌊 OClean</div>
-        <div class="login-form">
-            <input type="text" id="username" placeholder="Username" autocomplete="username">
-            <input type="password" id="password" placeholder="Password" autocomplete="current-password">
-            <button onclick="handleLogin()">Login</button>
-            <div class="login-error" id="loginError"></div>
+    <div id="menuScreen" class="hidden">
+        <div class="menu-title">🌊 OClean</div>
+        <div class="menu-subtitle">Ocean Cleanup Game</div>
+        <div class="menu-buttons">
+            <button class="menu-btn" onclick="startGameFromMenu()">🎮 Start Game</button>
+            <button class="menu-btn" onclick="showGuide()">📖 How to Play</button>
+        </div>
+    </div>
+
+    <div id="guideScreen" class="hidden">
+        <div class="guide-content">
+            <div class="guide-step" id="guideStep1">
+                <h2>🎯 Objective</h2>
+                <p>Clean the ocean by catching <strong>trash</strong> and avoiding <strong>fish</strong>!</p>
+                <div class="guide-visual">
+                    <span style="font-size: 48px;">🗑️ ✅</span>
+                    <span style="font-size: 48px; margin-left: 20px;">🐟 ❌</span>
+                </div>
+                <button class="guide-btn" onclick="nextGuideStep(2)">Next →</button>
+            </div>
+
+            <div class="guide-step hidden" id="guideStep2">
+                <h2>⬅️➡️ Move the Ship</h2>
+                <p>Use <strong>A/D</strong> or <strong>Arrow Keys ← →</strong> to move your ship left and right</p>
+                <div class="guide-visual">
+                    <kbd>A</kbd> <kbd>D</kbd> or <kbd>←</kbd> <kbd>→</kbd>
+                </div>
+                <button class="guide-btn" onclick="nextGuideStep(3)">Next →</button>
+            </div>
+
+            <div class="guide-step hidden" id="guideStep3">
+                <h2>⬇️ Drop the Hook</h2>
+                <p>Press <strong>S</strong> or <strong>Down Arrow ↓</strong> to drop the hook into the water</p>
+                <div class="guide-visual">
+                    <kbd>S</kbd> or <kbd>↓</kbd>
+                </div>
+                <button class="guide-btn" onclick="nextGuideStep(4)">Next →</button>
+            </div>
+
+            <div class="guide-step hidden" id="guideStep4">
+                <h2>⬆️ Pull Up</h2>
+                <p>Press <strong>W</strong> or <strong>Up Arrow ↑</strong> to pull the hook back up</p>
+                <p style="font-size: 14px; opacity: 0.8; margin-top: 10px;">The hook automatically pulls up when it catches something!</p>
+                <div class="guide-visual">
+                    <kbd>W</kbd> or <kbd>↑</kbd>
+                </div>
+                <button class="guide-btn" onclick="nextGuideStep(5)">Next →</button>
+            </div>
+
+            <div class="guide-step hidden" id="guideStep5">
+                <h2>🏆 Scoring</h2>
+                <p>✅ Catch <strong>trash</strong> = +1 point</p>
+                <p>❌ Catch <strong>fish</strong> = Game Over</p>
+                <p style="font-size: 14px; opacity: 0.8; margin-top: 15px;">As your score increases, the game gets harder: fish and trash move faster and become smaller!</p>
+                <button class="guide-btn" onclick="closeGuide()">Start Playing! 🎮</button>
+            </div>
         </div>
     </div>
 

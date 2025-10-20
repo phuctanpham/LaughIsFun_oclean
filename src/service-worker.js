@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oclean-v1.0.0';
+const CACHE_NAME = 'oclean-v1.0.1';
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -10,7 +10,6 @@ const STATIC_ASSETS = [
     'https://cdn.tailwindcss.com'
 ];
 
-// Install event - cache static assets
 self.addEventListener('install', (event) => {
     console.log('[SW] Installing service worker...');
     event.waitUntil(
@@ -27,7 +26,6 @@ self.addEventListener('install', (event) => {
     );
 });
 
-// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
     console.log('[SW] Activating service worker...');
     event.waitUntil(
@@ -47,17 +45,14 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch event - cache-first strategy with dynamic caching
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
-    // Skip caching for non-GET requests
     if (request.method !== 'GET') {
         return;
     }
 
-    // Handle image requests specially
     if (url.pathname.match(/\.(png|jpg|jpeg|gif|svg)$/)) {
         event.respondWith(
             caches.match(request).then((cachedResponse) => {
@@ -66,7 +61,6 @@ self.addEventListener('fetch', (event) => {
                 }
 
                 return fetch(request).then((response) => {
-                    // Only cache successful responses
                     if (response.status === 200) {
                         const responseClone = response.clone();
                         caches.open(CACHE_NAME).then((cache) => {
@@ -76,7 +70,6 @@ self.addEventListener('fetch', (event) => {
                     return response;
                 }).catch(() => {
                     console.log('[SW] Fetch failed for:', request.url);
-                    // Return a placeholder or continue without the image
                     return new Response('', { status: 404, statusText: 'Not Found' });
                 });
             })
@@ -84,7 +77,6 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Cache-first strategy for other assets
     event.respondWith(
         caches.match(request).then((cachedResponse) => {
             return cachedResponse || fetch(request).then((response) => {
@@ -99,7 +91,6 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-// Message event - for manual cache updates
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
