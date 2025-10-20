@@ -31,6 +31,52 @@
         let gameState = 'moving'; // 'moving', 'fishing', 'hooked_up', 'game_over'
 
         let ship, hook, entities;
+        let imagesLoaded = false;
+        let shipImg, hookImg;
+        let fishImages = [];
+        let trashImages = [];
+
+        // Load images
+        const loadImages = () => {
+            return new Promise((resolve) => {
+                let loaded = 0;
+                const totalImages = 12; // 1 ship + 1 hook + 5 fish + 5 trash
+
+                const checkAllLoaded = () => {
+                    loaded++;
+                    if (loaded === totalImages) {
+                        imagesLoaded = true;
+                        resolve();
+                    }
+                };
+
+                shipImg = new Image();
+                shipImg.onload = checkAllLoaded;
+                shipImg.onerror = checkAllLoaded;
+                shipImg.src = 'statics/ship.png';
+
+                hookImg = new Image();
+                hookImg.onload = checkAllLoaded;
+                hookImg.onerror = checkAllLoaded;
+                hookImg.src = 'statics/hook.png';
+
+                for (let i = 1; i <= 5; i++) {
+                    const fishImg = new Image();
+                    fishImg.onload = checkAllLoaded;
+                    fishImg.onerror = checkAllLoaded;
+                    fishImg.src = `statics/fishes/fish${i}.png`;
+                    fishImages.push(fishImg);
+                }
+
+                for (let i = 1; i <= 5; i++) {
+                    const trashImg = new Image();
+                    trashImg.onload = checkAllLoaded;
+                    trashImg.onerror = checkAllLoaded;
+                    trashImg.src = `statics/trashes/trash${i}.png`;
+                    trashImages.push(trashImg);
+                }
+            });
+        };
 
         const setupCanvas = () => {
             canvas.width = window.innerWidth;
@@ -74,6 +120,7 @@
 
         const createEntity = (type) => {
             const size = getEntitySize();
+            const imageIndex = Math.floor(Math.random() * 5);
             return {
                 x: Math.random() * canvas.width,
                 y: canvas.height * 0.4 + Math.random() * (canvas.height * 0.6 - size),
@@ -81,7 +128,8 @@
                 height: size,
                 speed: (Math.random() * 0.5 + 0.5) * getEntitySpeed(),
                 direction: Math.random() > 0.5 ? 1 : -1,
-                type: type
+                type: type,
+                imageIndex: imageIndex
             };
         };
 
@@ -176,9 +224,12 @@
             ctx.fillRect(0, canvas.height * 0.4, canvas.width, canvas.height * 0.6);
 
             // Ship
-            ctx.fillStyle = '#A52A2A';
-            ctx.font = `${ship.width/2}px sans-serif`;
-            ctx.fillText('🚤', ship.x - ship.width / 2, ship.y + ship.height / 2);
+            if (imagesLoaded && shipImg.complete && shipImg.naturalHeight !== 0) {
+                ctx.drawImage(shipImg, ship.x - ship.width / 2, ship.y - ship.height / 2, ship.width, ship.height);
+            } else {
+                ctx.fillStyle = '#A52A2A';
+                ctx.fillRect(ship.x - ship.width / 2, ship.y - ship.height / 2, ship.width, ship.height);
+            }
 
             // Hook line
             ctx.strokeStyle = '#fff';
@@ -189,19 +240,33 @@
             ctx.stroke();
 
             // Hook
-             ctx.fillStyle = '#C0C0C0';
-             ctx.font = `${getHookSize()}px sans-serif`;
-             ctx.fillText('⚓', hook.x - getHookSize() / 2, hook.y + getHookSize() / 2);
-
+            if (imagesLoaded && hookImg.complete && hookImg.naturalHeight !== 0) {
+                ctx.drawImage(hookImg, hook.x - getHookSize() / 2, hook.y - getHookSize() / 2, getHookSize(), getHookSize());
+            } else {
+                ctx.fillStyle = '#C0C0C0';
+                ctx.fillRect(hook.x - getHookSize() / 2, hook.y - getHookSize() / 2, getHookSize(), getHookSize());
+            }
 
             // Entities
             entities.forEach(entity => {
                 const size = getEntitySize();
                 entity.width = size;
                 entity.height = size;
-                ctx.font = `${size}px sans-serif`;
-                const emoji = entity.type === 'fish' ? '🐠' : '🗑️';
-                ctx.fillText(emoji, entity.x, entity.y + size);
+                
+                if (imagesLoaded) {
+                    const img = entity.type === 'fish' ? fishImages[entity.imageIndex] : trashImages[entity.imageIndex];
+                    if (img && img.complete && img.naturalHeight !== 0) {
+                        ctx.drawImage(img, entity.x, entity.y, size, size);
+                    } else {
+                        // Fallback to colored rectangle
+                        ctx.fillStyle = entity.type === 'fish' ? '#FF6347' : '#808080';
+                        ctx.fillRect(entity.x, entity.y, size, size);
+                    }
+                } else {
+                    // Fallback to colored rectangle while loading
+                    ctx.fillStyle = entity.type === 'fish' ? '#FF6347' : '#808080';
+                    ctx.fillRect(entity.x, entity.y, size, size);
+                }
             });
 
             // Score
@@ -234,8 +299,11 @@
         window.addEventListener('resize', setupCanvas);
         window.addEventListener('keydown', handleInput);
 
-        setupCanvas();
-        gameLoop();
+        // Load images and start game
+        loadImages().then(() => {
+            setupCanvas();
+            gameLoop();
+        });
     </script>
 </body>
 </html>
