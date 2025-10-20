@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Fishing Game</title>
+    <title>OClean - Ocean Cleanup Game</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#667eea">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -142,7 +142,7 @@
     <button id="installButton">📱 Install App</button>
 
     <div id="loadingScreen">
-        <div class="loading-text">🎣 Loading Fishing Game...</div>
+        <div class="loading-text">🌊 Loading OClean...</div>
         <div class="progress-bar-container">
             <div class="progress-bar" id="progressBar"></div>
         </div>
@@ -151,7 +151,7 @@
     </div>
 
     <div id="loginScreen" class="hidden">
-        <div class="login-title">🎣 Fishing Game</div>
+        <div class="login-title">🌊 OClean</div>
         <div class="login-form">
             <input type="text" id="username" placeholder="Username" autocomplete="username">
             <input type="password" id="password" placeholder="Password" autocomplete="current-password">
@@ -225,12 +225,10 @@
         let shipImg, hookImg;
         let fishImages = [];
         let trashImages = [];
-        let lanes = []; // Track which lanes are occupied
 
         // Default images as data URIs
         const DEFAULT_IMAGES = {
             fish: [
-                // Fish 1 - Orange fish
                 'data:image/svg+xml,' + encodeURIComponent(`
                     <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
                         <ellipse cx="35" cy="30" rx="20" ry="15" fill="#FF8C42"/>
@@ -239,7 +237,6 @@
                         <path d="M 15 30 L 5 20 L 5 40 Z" fill="#FF6B35"/>
                     </svg>
                 `),
-                // Fish 2 - Blue fish
                 'data:image/svg+xml,' + encodeURIComponent(`
                     <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
                         <ellipse cx="35" cy="30" rx="22" ry="16" fill="#4A90E2"/>
@@ -249,7 +246,6 @@
                         <ellipse cx="35" cy="22" rx="5" ry="3" fill="#5BA3F5"/>
                     </svg>
                 `),
-                // Fish 3 - Green fish
                 'data:image/svg+xml,' + encodeURIComponent(`
                     <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
                         <ellipse cx="35" cy="30" rx="18" ry="14" fill="#6BCF7F"/>
@@ -261,7 +257,6 @@
                 `)
             ],
             trash: [
-                // Bottle 1 - Green bottle
                 'data:image/svg+xml,' + encodeURIComponent(`
                     <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
                         <rect x="22" y="12" width="16" height="8" rx="2" fill="#8B4513"/>
@@ -270,7 +265,6 @@
                         <ellipse cx="30" cy="35" rx="7" ry="5" fill="white" opacity="0.3"/>
                     </svg>
                 `),
-                // Bottle 2 - Blue bottle
                 'data:image/svg+xml,' + encodeURIComponent(`
                     <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
                         <rect x="22" y="10" width="16" height="9" rx="2" fill="#654321"/>
@@ -279,7 +273,6 @@
                         <ellipse cx="30" cy="36" rx="7" ry="5" fill="white" opacity="0.3"/>
                     </svg>
                 `),
-                // Bottle 3 - Brown bottle
                 'data:image/svg+xml,' + encodeURIComponent(`
                     <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
                         <rect x="22" y="11" width="16" height="8" rx="2" fill="#8B4513"/>
@@ -324,7 +317,7 @@
             }
         });
 
-        // Image configuration
+        // Image configuration - FIXED PATHS
         const IMAGE_CONFIG = {
             ship: 'statics/ship.png',
             hook: 'statics/hook.png',
@@ -356,136 +349,65 @@
                     loadingInfo.textContent = `Loading: ${loadedCount} / ${totalImages} assets`;
                 };
 
-                // Load ship with fallback
-                shipImg = new Image();
-                const shipPromise = new Promise((res) => {
-                    let imageLoaded = false;
-                    
-                    shipImg.onload = () => {
-                        if (!imageLoaded) {
-                            imageLoaded = true;
-                            loadedCount++;
-                            console.log('✓ Loaded: ship.png');
-                            updateProgress();
-                            res();
-                        }
-                    };
-                    shipImg.onerror = () => {
-                        if (!imageLoaded) {
-                            imageLoaded = true;
-                            console.log('⚠ Using default ship image (file not found in statics/)');
-                            shipImg.src = DEFAULT_IMAGES.ship;
-                            // Wait for default image to load
-                            setTimeout(() => {
-                                loadedCount++;
-                                updateProgress();
-                                res();
-                            }, 100);
-                        }
-                    };
-                });
-                shipImg.src = IMAGE_CONFIG.ship;
-
-                // Load hook with fallback
-                hookImg = new Image();
-                const hookPromise = new Promise((res) => {
-                    let imageLoaded = false;
-                    
-                    hookImg.onload = () => {
-                        if (!imageLoaded) {
-                            imageLoaded = true;
-                            loadedCount++;
-                            console.log('✓ Loaded: hook.png');
-                            updateProgress();
-                            res();
-                        }
-                    };
-                    hookImg.onerror = () => {
-                        if (!imageLoaded) {
-                            imageLoaded = true;
-                            console.log('⚠ Using default hook image (file not found in statics/)');
-                            hookImg.src = DEFAULT_IMAGES.hook;
-                            setTimeout(() => {
-                                loadedCount++;
-                                updateProgress();
-                                res();
-                            }, 100);
-                        }
-                    };
-                });
-                hookImg.src = IMAGE_CONFIG.hook;
-
-                await Promise.all([shipPromise, hookPromise]);
-
-                // Load fish images with fallback
-                const fishPromises = IMAGE_CONFIG.fishes.map((src, index) => {
-                    return new Promise((res) => {
-                        let imageLoaded = false;
+                // Helper function to load image with fallback
+                const loadImageWithFallback = (src, fallbackSrc, imageName) => {
+                    return new Promise((resolve) => {
                         const img = new Image();
-                        
+                        let loaded = false;
+
                         img.onload = () => {
-                            if (!imageLoaded) {
-                                imageLoaded = true;
-                                fishImages.push(img);
+                            if (!loaded) {
+                                loaded = true;
                                 loadedCount++;
                                 console.log(`✓ Loaded: ${src}`);
                                 updateProgress();
-                                res();
+                                resolve(img);
                             }
                         };
+
                         img.onerror = () => {
-                            if (!imageLoaded) {
-                                imageLoaded = true;
-                                console.log(`⚠ Using default fish image ${index + 1} (file not found in statics/fishes/)`);
+                            if (!loaded) {
+                                loaded = true;
+                                console.log(`⚠ Using default ${imageName} (file not found: ${src})`);
                                 const defaultImg = new Image();
-                                defaultImg.src = DEFAULT_IMAGES.fish[index % DEFAULT_IMAGES.fish.length];
-                                fishImages.push(defaultImg);
-                                setTimeout(() => {
+                                defaultImg.onload = () => {
                                     loadedCount++;
                                     updateProgress();
-                                    res();
-                                }, 100);
+                                    resolve(defaultImg);
+                                };
+                                defaultImg.src = fallbackSrc;
                             }
                         };
+
                         img.src = src;
                     });
-                });
+                };
 
-                // Load trash images with fallback
-                const trashPromises = IMAGE_CONFIG.trashes.map((src, index) => {
-                    return new Promise((res) => {
-                        let imageLoaded = false;
-                        const img = new Image();
-                        
-                        img.onload = () => {
-                            if (!imageLoaded) {
-                                imageLoaded = true;
-                                trashImages.push(img);
-                                loadedCount++;
-                                console.log(`✓ Loaded: ${src}`);
-                                updateProgress();
-                                res();
-                            }
-                        };
-                        img.onerror = () => {
-                            if (!imageLoaded) {
-                                imageLoaded = true;
-                                console.log(`⚠ Using default trash image ${index + 1} (file not found in statics/trashes/)`);
-                                const defaultImg = new Image();
-                                defaultImg.src = DEFAULT_IMAGES.trash[index % DEFAULT_IMAGES.trash.length];
-                                trashImages.push(defaultImg);
-                                setTimeout(() => {
-                                    loadedCount++;
-                                    updateProgress();
-                                    res();
-                                }, 100);
-                            }
-                        };
-                        img.src = src;
-                    });
-                });
+                // Load ship
+                shipImg = await loadImageWithFallback(IMAGE_CONFIG.ship, DEFAULT_IMAGES.ship, 'ship');
 
-                await Promise.all([...fishPromises, ...trashPromises]);
+                // Load hook
+                hookImg = await loadImageWithFallback(IMAGE_CONFIG.hook, DEFAULT_IMAGES.hook, 'hook');
+
+                // Load fish images
+                for (let i = 0; i < IMAGE_CONFIG.fishes.length; i++) {
+                    const img = await loadImageWithFallback(
+                        IMAGE_CONFIG.fishes[i],
+                        DEFAULT_IMAGES.fish[i % DEFAULT_IMAGES.fish.length],
+                        `fish ${i + 1}`
+                    );
+                    fishImages.push(img);
+                }
+
+                // Load trash images
+                for (let i = 0; i < IMAGE_CONFIG.trashes.length; i++) {
+                    const img = await loadImageWithFallback(
+                        IMAGE_CONFIG.trashes[i],
+                        DEFAULT_IMAGES.trash[i % DEFAULT_IMAGES.trash.length],
+                        `trash ${i + 1}`
+                    );
+                    trashImages.push(img);
+                }
 
                 console.log(`Loaded ${fishImages.length} fish images`);
                 console.log(`Loaded ${trashImages.length} trash images`);
@@ -509,7 +431,8 @@
 
         const getEntitySize = () => Math.max(30, 60 - score * 2);
         const getHookSize = () => getEntitySize() * 0.4;
-        const getEntitySpeed = () => 2 + score * 0.3;
+        // REDUCED SPEED - decreases as score increases
+        const getEntitySpeed = () => Math.max(1, 2.5 - score * 0.15);
         const getTrashCount = () => Math.max(2, 10 - score);
         const getFishCount = () => 5 + score;
 
@@ -562,36 +485,24 @@
             }
         };
 
-        const createEntity = (type, forcePosition = null, laneY = null, laneHeight = null, laneIndex = null) => {
+        const createEntity = (type) => {
             const size = getEntitySize();
             const imageArray = type === 'fish' ? fishImages : trashImages;
             const imageIndex = imageArray.length > 0 ? Math.floor(Math.random() * imageArray.length) : 0;
             
-            let x, direction;
-            if (forcePosition) {
-                x = forcePosition.x;
-                direction = forcePosition.direction;
-            } else {
-                // Randomly spawn from left or right side
-                direction = Math.random() > 0.5 ? 1 : -1;
-                x = direction === 1 ? -size : canvas.width + size;
-            }
-            
-            // Use provided lane or calculate random position
-            const y = laneY !== null ? laneY + (laneHeight - size) / 2 : canvas.height * 0.4 + Math.random() * (canvas.height * 0.6 - size);
+            const direction = Math.random() > 0.5 ? 1 : -1;
+            const x = direction === 1 ? -size : canvas.width + size;
+            const y = canvas.height * 0.4 + Math.random() * (canvas.height * 0.6 - size);
             
             return {
                 x: x,
                 y: y,
                 width: size,
                 height: size,
-                speed: (Math.random() * 1 + 1.5) * getEntitySpeed(), // Varied speed
+                speed: (Math.random() * 0.5 + 0.75) * getEntitySpeed(),
                 direction: direction,
                 type: type,
-                imageIndex: imageIndex,
-                lane: laneY,
-                laneHeight: laneHeight,
-                laneIndex: laneIndex
+                imageIndex: imageIndex
             };
         };
 
@@ -647,14 +558,12 @@
                 entities.forEach(entity => {
                     entity.x += entity.speed * entity.direction;
                     
-                    // Check if entity went off screen
                     if ((entity.direction === 1 && entity.x > canvas.width + entity.width) ||
                         (entity.direction === -1 && entity.x < -entity.width)) {
-                        // Respawn from opposite side in the same lane
                         const newDirection = Math.random() > 0.5 ? 1 : -1;
                         entity.x = newDirection === 1 ? -entity.width : canvas.width + entity.width;
                         entity.direction = newDirection;
-                        entity.speed = (Math.random() * 0.5 + 0.5) * getEntitySpeed();
+                        entity.speed = (Math.random() * 0.5 + 0.75) * getEntitySpeed();
                         entity.imageIndex = Math.floor(Math.random() * (entity.type === 'fish' ? fishImages : trashImages).length);
                     }
                 });
@@ -689,14 +598,12 @@
                 
                 entity.x += entity.speed * entity.direction;
                 
-                // Check if entity went off screen
                 if ((entity.direction === 1 && entity.x > canvas.width + entity.width) ||
                     (entity.direction === -1 && entity.x < -entity.width)) {
-                    // Respawn from opposite side in the same lane
                     const newDirection = Math.random() > 0.5 ? 1 : -1;
                     entity.x = newDirection === 1 ? -entity.width : canvas.width + entity.width;
                     entity.direction = newDirection;
-                    entity.speed = (Math.random() * 0.5 + 0.5) * getEntitySpeed();
+                    entity.speed = (Math.random() * 0.5 + 0.75) * getEntitySpeed();
                     entity.imageIndex = Math.floor(Math.random() * (entity.type === 'fish' ? fishImages : trashImages).length);
                 }
             });
@@ -765,11 +672,9 @@
             entities.forEach(entity => {
                 const img = entity.type === 'fish' ? fishImages[entity.imageIndex] : trashImages[entity.imageIndex];
                 
-                // Save context and apply transformations for flipping
                 ctx.save();
                 
                 if (entity.direction === -1) {
-                    // Flip horizontally when moving left
                     ctx.translate(entity.x + entity.width, entity.y);
                     ctx.scale(-1, 1);
                     
@@ -780,7 +685,6 @@
                         ctx.fillRect(0, 0, entity.width, entity.height);
                     }
                 } else {
-                    // Normal orientation when moving right
                     if (img && img.complete && img.naturalHeight !== 0) {
                         ctx.drawImage(img, entity.x, entity.y, entity.width, entity.height);
                     } else {
@@ -836,4 +740,4 @@
         loadImages();
     </script>
 </body>
-</html>
+</html>prompts

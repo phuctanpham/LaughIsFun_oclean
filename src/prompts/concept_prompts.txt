@@ -1,0 +1,25 @@
+write progressive webapp for generating a fishing game.
+
+- There are two parts on a screen the top part is sky with a small ship, the bottom part is the ocean with multi fishs and multi trashes.
+
+- User can use sparow's keyboard to move ship horizal when stop fishing
+
+- When fishing, the ship is stable , the hook is slowly down without using sparow's keyboard to up. The speed of fishing up is always unchanged.
+
+- Fishes and Trashes is alway moving horizontally randomly for both two sides
+
+- The higher score, the screen is zoom in more, the size of fishes and trashes is smaller. Their moving speed is higher. The size of hook is equal 2/5 the size of fishes and trashes for all sittuation. the size of fishes and trashes is equal each other for all sittuation.
+
+- Whenever the hook touch a fish or a trash, it automatic to drag fishing up veriza verizal. When a hooked fish or a hooked trash touch the ship, it return to status of moving ship enablement.
+
+- The top part is equal 2/5 of screen.
+
+- Whenever hook touch fish , the game is over to stop the game and reset score.
+
+- Fishes' image is placed inside root/src/static/fishes
+
+- trashes'image is placed inside root/src/static/trashes
+
+- ship's image is placed iinnside root/src/static
+
+- hook's image is place inside root/src/static

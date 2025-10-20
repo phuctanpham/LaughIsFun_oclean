@@ -1,0 +1,105 @@
+PWA Generation Prompt: Advanced Fishing Game
+
+Goal: Generate a single, complete, self-contained HTML file for a Progressive Web App (PWA) that implements an unusual, physics-driven fishing game. Use Tailwind CSS for base styling and a JavaScript Canvas (2D) for the game environment and animation loop.
+
+Game Environment and UI Constraints
+
+Single File Mandate: All HTML, CSS (using Tailwind CDN + custom <style> for canvas), and JavaScript MUST be contained within one index.html file.
+
+Screen Division: The game screen must be divided vertically:
+
+Sky (Top): 40% (2/5) of the screen height. Background color: light blue/cyan.
+
+Ocean (Bottom): 60% (3/5) of the screen height. Background color: dark blue/teal.
+
+Graphics: Use Canvas 2D drawing primitives (rectangles, circles) and Emojis/Inline SVGs for game assets (ship, hook, fish, trash) as substitutes for external images, acknowledging the requested file paths cannot be loaded from the local file system.
+
+Responsiveness: The canvas MUST be fully responsive and centered, adapting to the full width of the viewport.
+
+Game Objects and Initial State
+
+Ship: Located in the Sky section, moving horizontally.
+
+Hook: Extends vertically from the ship into the Ocean section.
+
+Entities (Fish & Trash): Multiple instances of both must be present and initially confined to the Ocean section.
+
+Initial State: Game starts in the 'moving' state. Score is 0.
+
+Core Game Mechanics and Controls
+
+1. Ship Movement (State: 'moving')
+
+Controls: The ship moves horizontally using the Arrow Keys (Left/Right) or 'A'/'D' keys.
+
+Boundary: Ship movement is constrained to the width of the Sky area.
+
+Fishing Start: Pressing the Down Arrow Key or 'S' key stops the ship and initiates the 'fishing' state.
+
+2. Fishing and Retrieval (States: 'fishing', 'hooked_up')
+
+Dropping ('fishing' state):
+
+The ship remains stable (fixed X position).
+
+The hook moves slowly and steadily down into the water.
+
+Keyboard input is disabled (except for the 'moving' state return control).
+
+Retrieval ('hooked_up' state):
+
+Once a collision occurs (see collisions below), the hook automatically moves up at a constant, unchanged speed. User input remains disabled.
+
+3. Entity Movement (Fish and Trash)
+
+Continuous Horizontal Movement: All fish and trash entities move horizontally within the Ocean section.
+
+Randomized Motion: Each entity must have a randomized initial speed and direction (left or right). When an entity hits a horizontal boundary (left/right edge of the ocean area), its direction reverses randomly (e.g., flip X speed).
+
+4. Scoring and Scaling (Difficulty Progression)
+
+The entire game scales based on the current score:
+
+Scaling Rule: Score dictates the visual scale (zoom) and speed.
+
+Zoom Effect: As the score increases, the screen should zoom in visually. Implement this by decreasing the base size of all dynamic entities and increasing their movement speed.
+
+Entity Size Constraint: The size of all fish entities must always be equal to the size of all trash entities.
+
+Hook Size Constraint: The hook's size must always be equal to 2/5 (40%) of the current size of the fish/trash entities.
+
+Speed Scaling: The horizontal speed of the fish/trash must increase proportionally to the score.
+
+5. Collision and State Transition Rules
+
+Hook Touches Trash:
+
+Transition to the 'hooked_up' state.
+
+The trash entity becomes rigidly attached to the hook.
+
+The automatic upward retrieval starts.
+
+Hooked Trash Touches Ship:
+
+Action: Score increases by 1.
+
+Transition: Game returns to the 'moving' state (ship movement enabled).
+
+The caught trash is despawned, and a new entity (random fish or trash) is spawned elsewhere in the ocean.
+
+Hook Touches Fish:
+
+Action: Game Over.
+
+Transition: Game enters the 'game_over' state. The score resets to 0, and the game loop pauses. A restart message should be displayed.
+
+Technical Implementation Details
+
+Game Loop: Use requestAnimationFrame for smooth animation.
+
+State Management: Use a simple JavaScript object or variable (gameState) to track the current state ('moving', 'fishing', 'hooked_up', 'game_over').
+
+Initial Objects: Instantiate at least 5 fish and 5 trash entities with random positions and initial speeds in the ocean area.
+
+Error Handling: Include basic error handling for canvas context initialization.
