@@ -15,64 +15,167 @@
             display: block;
             background-color: #000;
         }
+        #loadingScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #loadingScreen.hidden {
+            display: none;
+        }
+        .loading-text {
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .progress-bar-container {
+            width: 300px;
+            height: 30px;
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 15px;
+        }
+        .loading-info {
+            color: white;
+            font-size: 16px;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .error-message {
+            color: #ff6b6b;
+            font-size: 14px;
+            margin-top: 10px;
+            max-width: 400px;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center h-screen">
+    <div id="loadingScreen">
+        <div class="loading-text">🎣 Loading Fishing Game...</div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="loading-info" id="loadingInfo">Loading assets: 0 / 12</div>
+        <div class="error-message" id="errorMessage"></div>
+    </div>
     <canvas id="gameCanvas"></canvas>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const loadingScreen = document.getElementById('loadingScreen');
+        const progressBar = document.getElementById('progressBar');
+        const loadingInfo = document.getElementById('loadingInfo');
+        const errorMessage = document.getElementById('errorMessage');
 
         if (!ctx) {
             alert('Canvas 2D context is not supported. Please use a modern browser.');
         }
 
         let score = 0;
-        let gameState = 'moving'; // 'moving', 'fishing', 'hooked_up', 'game_over'
-
+        let gameState = 'moving';
         let ship, hook, entities;
         let imagesLoaded = false;
         let shipImg, hookImg;
         let fishImages = [];
         let trashImages = [];
 
-        // Load images
+        // Load images with progress tracking
         const loadImages = () => {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 let loaded = 0;
-                const totalImages = 12; // 1 ship + 1 hook + 5 fish + 5 trash
+                let failed = 0;
+                const totalImages = 12;
+                const failedImages = [];
 
-                const checkAllLoaded = () => {
-                    loaded++;
-                    if (loaded === totalImages) {
-                        imagesLoaded = true;
-                        resolve();
+                const updateProgress = () => {
+                    const progress = (loaded / totalImages) * 100;
+                    progressBar.style.width = progress + '%';
+                    loadingInfo.textContent = `Loading assets: ${loaded} / ${totalImages}`;
+                };
+
+                const checkAllLoaded = (imageName, success) => {
+                    if (success) {
+                        loaded++;
+                    } else {
+                        failed++;
+                        failedImages.push(imageName);
+                    }
+                    
+                    updateProgress();
+
+                    if (loaded + failed === totalImages) {
+                        if (failed > 0) {
+                            errorMessage.textContent = `Warning: ${failed} image(s) failed to load. Using fallback graphics.`;
+                        }
+                        
+                        setTimeout(() => {
+                            imagesLoaded = true;
+                            loadingScreen.classList.add('hidden');
+                            resolve();
+                        }, 500);
                     }
                 };
 
+                // Load ship image
                 shipImg = new Image();
-                shipImg.onload = checkAllLoaded;
-                shipImg.onerror = checkAllLoaded;
+                shipImg.onload = () => checkAllLoaded('ship.png', true);
+                shipImg.onerror = () => {
+                    console.error('Failed to load: ship.png');
+                    checkAllLoaded('ship.png', false);
+                };
                 shipImg.src = 'statics/ship.png';
 
+                // Load hook image
                 hookImg = new Image();
-                hookImg.onload = checkAllLoaded;
-                hookImg.onerror = checkAllLoaded;
+                hookImg.onload = () => checkAllLoaded('hook.png', true);
+                hookImg.onerror = () => {
+                    console.error('Failed to load: hook.png');
+                    checkAllLoaded('hook.png', false);
+                };
                 hookImg.src = 'statics/hook.png';
 
+                // Load fish images
                 for (let i = 1; i <= 5; i++) {
                     const fishImg = new Image();
-                    fishImg.onload = checkAllLoaded;
-                    fishImg.onerror = checkAllLoaded;
-                    fishImg.src = `statics/fishes/fish${i}.png`;
+                    const fileName = `fish${i}.png`;
+                    fishImg.onload = () => checkAllLoaded(fileName, true);
+                    fishImg.onerror = () => {
+                        console.error(`Failed to load: ${fileName}`);
+                        checkAllLoaded(fileName, false);
+                    };
+                    fishImg.src = `statics/fishes/${fileName}`;
                     fishImages.push(fishImg);
                 }
 
+                // Load trash images
                 for (let i = 1; i <= 5; i++) {
                     const trashImg = new Image();
-                    trashImg.onload = checkAllLoaded;
-                    trashImg.onerror = checkAllLoaded;
-                    trashImg.src = `statics/trashes/trash${i}.png`;
+                    const fileName = `trash${i}.png`;
+                    trashImg.onload = () => checkAllLoaded(fileName, true);
+                    trashImg.onerror = () => {
+                        console.error(`Failed to load: ${fileName}`);
+                        checkAllLoaded(fileName, false);
+                    };
+                    trashImg.src = `statics/trashes/${fileName}`;
                     trashImages.push(trashImg);
                 }
             });
@@ -81,11 +184,12 @@
         const setupCanvas = () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            resetGame();
+            if (!entities || entities.length === 0) {
+                resetGame();
+            }
         };
 
         const getScale = () => 1 + score * 0.1;
-
         const getEntitySize = () => 30 / getScale();
         const getHookSize = () => getEntitySize() * 0.4;
         const getEntitySpeed = () => 2 + score * 0.2;
@@ -96,7 +200,7 @@
 
             ship = {
                 x: canvas.width / 2,
-                y: canvas.height * 0.4 * 0.5, // Middle of the sky
+                y: canvas.height * 0.4 * 0.5,
                 width: 80,
                 height: 40,
                 speed: 5
@@ -160,19 +264,17 @@
         const update = () => {
             if (gameState === 'game_over') return;
 
-            // Ship and hook horizontal sync
             if (gameState === 'moving') {
                 hook.x = ship.x;
             }
 
-            // Hook movement
             if (gameState === 'fishing') {
                 hook.y += hook.speed;
                 if (hook.y > canvas.height) {
-                    gameState = 'hooked_up'; // Missed, retrieve empty
+                    gameState = 'hooked_up';
                 }
             } else if (gameState === 'hooked_up') {
-                hook.y -= hook.speed * 2; // Faster retrieval
+                hook.y -= hook.speed * 2;
                 if (hook.attached) {
                     hook.attached.x = hook.x;
                     hook.attached.y = hook.y + getHookSize();
@@ -192,7 +294,6 @@
                 }
             }
 
-            // Entity movement
             entities.forEach(entity => {
                 entity.x += entity.speed * entity.direction;
                 if (entity.x <= 0 || entity.x + entity.width >= canvas.width) {
@@ -200,13 +301,12 @@
                 }
             });
 
-            // Collision detection
             if (gameState === 'fishing') {
                 for (const entity of entities) {
                     if (checkCollision(hook, entity)) {
                         if (entity.type === 'fish') {
                             gameState = 'game_over';
-                        } else { // trash
+                        } else {
                             gameState = 'hooked_up';
                             hook.attached = entity;
                         }
@@ -218,13 +318,13 @@
 
         const draw = () => {
             // Background
-            ctx.fillStyle = '#87CEEB'; // Sky
+            ctx.fillStyle = '#87CEEB';
             ctx.fillRect(0, 0, canvas.width, canvas.height * 0.4);
-            ctx.fillStyle = '#008080'; // Ocean
+            ctx.fillStyle = '#008080';
             ctx.fillRect(0, canvas.height * 0.4, canvas.width, canvas.height * 0.6);
 
             // Ship
-            if (imagesLoaded && shipImg.complete && shipImg.naturalHeight !== 0) {
+            if (shipImg.complete && shipImg.naturalHeight !== 0) {
                 ctx.drawImage(shipImg, ship.x - ship.width / 2, ship.y - ship.height / 2, ship.width, ship.height);
             } else {
                 ctx.fillStyle = '#A52A2A';
@@ -240,11 +340,12 @@
             ctx.stroke();
 
             // Hook
-            if (imagesLoaded && hookImg.complete && hookImg.naturalHeight !== 0) {
-                ctx.drawImage(hookImg, hook.x - getHookSize() / 2, hook.y - getHookSize() / 2, getHookSize(), getHookSize());
+            const hookSize = getHookSize();
+            if (hookImg.complete && hookImg.naturalHeight !== 0) {
+                ctx.drawImage(hookImg, hook.x - hookSize / 2, hook.y - hookSize / 2, hookSize, hookSize);
             } else {
                 ctx.fillStyle = '#C0C0C0';
-                ctx.fillRect(hook.x - getHookSize() / 2, hook.y - getHookSize() / 2, getHookSize(), getHookSize());
+                ctx.fillRect(hook.x - hookSize / 2, hook.y - hookSize / 2, hookSize, hookSize);
             }
 
             // Entities
@@ -253,17 +354,10 @@
                 entity.width = size;
                 entity.height = size;
                 
-                if (imagesLoaded) {
-                    const img = entity.type === 'fish' ? fishImages[entity.imageIndex] : trashImages[entity.imageIndex];
-                    if (img && img.complete && img.naturalHeight !== 0) {
-                        ctx.drawImage(img, entity.x, entity.y, size, size);
-                    } else {
-                        // Fallback to colored rectangle
-                        ctx.fillStyle = entity.type === 'fish' ? '#FF6347' : '#808080';
-                        ctx.fillRect(entity.x, entity.y, size, size);
-                    }
+                const img = entity.type === 'fish' ? fishImages[entity.imageIndex] : trashImages[entity.imageIndex];
+                if (img && img.complete && img.naturalHeight !== 0) {
+                    ctx.drawImage(img, entity.x, entity.y, size, size);
                 } else {
-                    // Fallback to colored rectangle while loading
                     ctx.fillStyle = entity.type === 'fish' ? '#FF6347' : '#808080';
                     ctx.fillRect(entity.x, entity.y, size, size);
                 }
@@ -299,7 +393,7 @@
         window.addEventListener('resize', setupCanvas);
         window.addEventListener('keydown', handleInput);
 
-        // Load images and start game
+        // Initialize game with loading screen
         loadImages().then(() => {
             setupCanvas();
             gameLoop();
