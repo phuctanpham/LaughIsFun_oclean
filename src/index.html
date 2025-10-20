@@ -1,1 +1,241 @@
-hellơ world !
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Fishing Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #333;
+        }
+        canvas {
+            display: block;
+            background-color: #000;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen">
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+            alert('Canvas 2D context is not supported. Please use a modern browser.');
+        }
+
+        let score = 0;
+        let gameState = 'moving'; // 'moving', 'fishing', 'hooked_up', 'game_over'
+
+        let ship, hook, entities;
+
+        const setupCanvas = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            resetGame();
+        };
+
+        const getScale = () => 1 + score * 0.1;
+
+        const getEntitySize = () => 30 / getScale();
+        const getHookSize = () => getEntitySize() * 0.4;
+        const getEntitySpeed = () => 2 + score * 0.2;
+
+        const resetGame = () => {
+            score = 0;
+            gameState = 'moving';
+
+            ship = {
+                x: canvas.width / 2,
+                y: canvas.height * 0.4 * 0.5, // Middle of the sky
+                width: 80,
+                height: 40,
+                speed: 5
+            };
+
+            hook = {
+                x: ship.x,
+                y: ship.y,
+                width: getHookSize(),
+                height: getHookSize(),
+                speed: 3,
+                attached: null
+            };
+
+            entities = [];
+            for (let i = 0; i < 5; i++) {
+                entities.push(createEntity('fish'));
+                entities.push(createEntity('trash'));
+            }
+        };
+
+        const createEntity = (type) => {
+            const size = getEntitySize();
+            return {
+                x: Math.random() * canvas.width,
+                y: canvas.height * 0.4 + Math.random() * (canvas.height * 0.6 - size),
+                width: size,
+                height: size,
+                speed: (Math.random() * 0.5 + 0.5) * getEntitySpeed(),
+                direction: Math.random() > 0.5 ? 1 : -1,
+                type: type
+            };
+        };
+
+        const handleInput = (e) => {
+            if (gameState === 'moving') {
+                if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+                    ship.x -= ship.speed;
+                } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+                    ship.x += ship.speed;
+                } else if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') {
+                    gameState = 'fishing';
+                }
+                ship.x = Math.max(ship.width / 2, Math.min(canvas.width - ship.width / 2, ship.x));
+            }
+            if (gameState === 'game_over' && e.key === 'Enter') {
+                resetGame();
+                gameLoop();
+            }
+        };
+
+        const checkCollision = (obj1, obj2) => {
+            return obj1.x < obj2.x + obj2.width &&
+                   obj1.x + obj1.width > obj2.x &&
+                   obj1.y < obj2.y + obj2.height &&
+                   obj1.y + obj1.height > obj2.y;
+        };
+
+        const update = () => {
+            if (gameState === 'game_over') return;
+
+            // Ship and hook horizontal sync
+            if (gameState === 'moving') {
+                hook.x = ship.x;
+            }
+
+            // Hook movement
+            if (gameState === 'fishing') {
+                hook.y += hook.speed;
+                if (hook.y > canvas.height) {
+                    gameState = 'hooked_up'; // Missed, retrieve empty
+                }
+            } else if (gameState === 'hooked_up') {
+                hook.y -= hook.speed * 2; // Faster retrieval
+                if (hook.attached) {
+                    hook.attached.x = hook.x;
+                    hook.attached.y = hook.y + getHookSize();
+                }
+
+                if (hook.y < ship.y) {
+                    if (hook.attached) {
+                        if (checkCollision(hook, ship)) {
+                             score++;
+                             entities = entities.filter(e => e !== hook.attached);
+                             entities.push(createEntity(Math.random() > 0.5 ? 'fish' : 'trash'));
+                        }
+                    }
+                    hook.y = ship.y;
+                    hook.attached = null;
+                    gameState = 'moving';
+                }
+            }
+
+            // Entity movement
+            entities.forEach(entity => {
+                entity.x += entity.speed * entity.direction;
+                if (entity.x <= 0 || entity.x + entity.width >= canvas.width) {
+                    entity.direction *= -1;
+                }
+            });
+
+            // Collision detection
+            if (gameState === 'fishing') {
+                for (const entity of entities) {
+                    if (checkCollision(hook, entity)) {
+                        if (entity.type === 'fish') {
+                            gameState = 'game_over';
+                        } else { // trash
+                            gameState = 'hooked_up';
+                            hook.attached = entity;
+                        }
+                        break;
+                    }
+                }
+            }
+        };
+
+        const draw = () => {
+            // Background
+            ctx.fillStyle = '#87CEEB'; // Sky
+            ctx.fillRect(0, 0, canvas.width, canvas.height * 0.4);
+            ctx.fillStyle = '#008080'; // Ocean
+            ctx.fillRect(0, canvas.height * 0.4, canvas.width, canvas.height * 0.6);
+
+            // Ship
+            ctx.fillStyle = '#A52A2A';
+            ctx.font = `${ship.width/2}px sans-serif`;
+            ctx.fillText('🚤', ship.x - ship.width / 2, ship.y + ship.height / 2);
+
+            // Hook line
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(ship.x, ship.y);
+            ctx.lineTo(hook.x, hook.y);
+            ctx.stroke();
+
+            // Hook
+             ctx.fillStyle = '#C0C0C0';
+             ctx.font = `${getHookSize()}px sans-serif`;
+             ctx.fillText('⚓', hook.x - getHookSize() / 2, hook.y + getHookSize() / 2);
+
+
+            // Entities
+            entities.forEach(entity => {
+                const size = getEntitySize();
+                entity.width = size;
+                entity.height = size;
+                ctx.font = `${size}px sans-serif`;
+                const emoji = entity.type === 'fish' ? '🐠' : '🗑️';
+                ctx.fillText(emoji, entity.x, entity.y + size);
+            });
+
+            // Score
+            ctx.fillStyle = '#fff';
+            ctx.font = '24px Arial';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+
+            if (gameState === 'game_over') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#fff';
+                ctx.font = '48px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+                ctx.font = '24px Arial';
+                ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2);
+                ctx.fillText('Press Enter to Restart', canvas.width / 2, canvas.height / 2 + 40);
+                ctx.textAlign = 'left';
+            }
+        };
+
+        const gameLoop = () => {
+            update();
+            draw();
+            if (gameState !== 'game_over') {
+                requestAnimationFrame(gameLoop);
+            }
+        };
+
+        window.addEventListener('resize', setupCanvas);
+        window.addEventListener('keydown', handleInput);
+
+        setupCanvas();
+        gameLoop();
+    </script>
+</body>
+</html>
