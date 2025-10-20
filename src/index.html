@@ -101,83 +101,78 @@
         // Load images with progress tracking
         const loadImages = () => {
             return new Promise((resolve, reject) => {
-                let loaded = 0;
-                let failed = 0;
-                const totalImages = 12;
-                const failedImages = [];
-
-                const updateProgress = () => {
-                    const progress = (loaded / totalImages) * 100;
-                    progressBar.style.width = progress + '%';
-                    loadingInfo.textContent = `Loading assets: ${loaded} / ${totalImages}`;
+                const imageFiles = {
+                    ship: 'statics/ship.png',
+                    hook: 'statics/hook.png',
+                    fishes: [],
+                    trashes: []
                 };
 
-                const checkAllLoaded = (imageName, success) => {
-                    if (success) {
-                        loaded++;
-                    } else {
-                        failed++;
-                        failedImages.push(imageName);
+                // Dynamically discover all fish and trash images
+                const fishPromises = [];
+                const trashPromises = [];
+
+                // Try to load fish images (we'll try up to 20 possible images)
+                for (let i = 1; i <= 20; i++) {
+                    const fishImg = new Image();
+                    const promise = new Promise((res) => {
+                        fishImg.onload = () => {
+                            fishImages.push(fishImg);
+                            res(true);
+                        };
+                        fishImg.onerror = () => res(false);
+                    });
+                    fishImg.src = `statics/fishes/fish${i}.png`;
+                    fishPromises.push(promise);
+                }
+
+                // Try to load trash images (we'll try up to 20 possible images)
+                for (let i = 1; i <= 20; i++) {
+                    const trashImg = new Image();
+                    const promise = new Promise((res) => {
+                        trashImg.onload = () => {
+                            trashImages.push(trashImg);
+                            res(true);
+                        };
+                        trashImg.onerror = () => res(false);
+                    });
+                    trashImg.src = `statics/trashes/trash${i}.png`;
+                    trashPromises.push(promise);
+                }
+
+                // Load ship and hook
+                const shipPromise = new Promise((res) => {
+                    shipImg = new Image();
+                    shipImg.onload = () => res(true);
+                    shipImg.onerror = () => res(false);
+                    shipImg.src = imageFiles.ship;
+                });
+
+                const hookPromise = new Promise((res) => {
+                    hookImg = new Image();
+                    hookImg.onload = () => res(true);
+                    hookImg.onerror = () => res(false);
+                    hookImg.src = imageFiles.hook;
+                });
+
+                // Wait for all images to attempt loading
+                Promise.all([shipPromise, hookPromise, ...fishPromises, ...trashPromises]).then(() => {
+                    const totalLoaded = 2 + fishImages.length + trashImages.length;
+                    
+                    loadingInfo.textContent = `Assets loaded: ${totalLoaded} images (${fishImages.length} fish, ${trashImages.length} trash)`;
+                    
+                    if (fishImages.length === 0 || trashImages.length === 0) {
+                        errorMessage.textContent = `Warning: Missing images. Found ${fishImages.length} fish and ${trashImages.length} trash images.`;
                     }
                     
-                    updateProgress();
-
-                    if (loaded + failed === totalImages) {
-                        if (failed > 0) {
-                            errorMessage.textContent = `Warning: ${failed} image(s) failed to load. Using fallback graphics.`;
-                        }
-                        
-                        setTimeout(() => {
-                            imagesLoaded = true;
-                            loadingScreen.classList.add('hidden');
-                            resolve();
-                        }, 500);
-                    }
-                };
-
-                // Load ship image
-                shipImg = new Image();
-                shipImg.onload = () => checkAllLoaded('ship.png', true);
-                shipImg.onerror = () => {
-                    console.error('Failed to load: ship.png');
-                    checkAllLoaded('ship.png', false);
-                };
-                shipImg.src = 'statics/ship.png';
-
-                // Load hook image
-                hookImg = new Image();
-                hookImg.onload = () => checkAllLoaded('hook.png', true);
-                hookImg.onerror = () => {
-                    console.error('Failed to load: hook.png');
-                    checkAllLoaded('hook.png', false);
-                };
-                hookImg.src = 'statics/hook.png';
-
-                // Load fish images
-                for (let i = 1; i <= 5; i++) {
-                    const fishImg = new Image();
-                    const fileName = `fish${i}.png`;
-                    fishImg.onload = () => checkAllLoaded(fileName, true);
-                    fishImg.onerror = () => {
-                        console.error(`Failed to load: ${fileName}`);
-                        checkAllLoaded(fileName, false);
-                    };
-                    fishImg.src = `statics/fishes/${fileName}`;
-                    fishImages.push(fishImg);
-                }
-
-                // Load trash images
-                for (let i = 1; i <= 5; i++) {
-                    const trashImg = new Image();
-                    const fileName = `trash${i}.png`;
-                    trashImg.onload = () => checkAllLoaded(fileName, true);
-                    trashImg.onerror = () => {
-                        console.error(`Failed to load: ${fileName}`);
-                        checkAllLoaded(fileName, false);
-                    };
-                    trashImg.src = `statics/trashes/${fileName}`;
-                    trashImages.push(trashImg);
-                }
+                    progressBar.style.width = '100%';
+                    
+                    setTimeout(() => {
+                        imagesLoaded = true;
+                        loadingScreen.classList.add('hidden');
+                        resolve();
+                    }, 500);
+                });
             });
         };
 
@@ -190,8 +185,8 @@
         };
 
         const getScale = () => 1 + score * 0.1;
-        const getEntitySize = () => 30 / getScale();
-        const getHookSize = () => getEntitySize() * 0.4;
+        const getEntitySize = () => 60; // Fixed size for fish and trash
+        const getHookSize = () => getEntitySize() * 0.4; // Hook is always 40% of entity size
         const getEntitySpeed = () => 2 + score * 0.2;
 
         const resetGame = () => {
