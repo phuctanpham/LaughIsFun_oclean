@@ -113,9 +113,34 @@
             margin-top: 10px;
             text-align: center;
         }
+        #installButton {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 999;
+            display: none;
+            transition: transform 0.2s;
+        }
+        #installButton:hover {
+            transform: translateY(-2px);
+        }
+        #installButton.show {
+            display: block;
+        }
     </style>
 </head>
 <body class="flex items-center justify-center h-screen">
+    <button id="installButton">📱 Install App</button>
+
     <div id="loadingScreen">
         <div class="loading-text">🎣 Loading Fishing Game...</div>
         <div class="progress-bar-container">
@@ -137,6 +162,40 @@
 
     <canvas id="gameCanvas"></canvas>
     <script>
+        // PWA Install Handling
+        let deferredPrompt;
+        const installButton = document.getElementById('installButton');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installButton.classList.add('show');
+            console.log('PWA: Install prompt available');
+        });
+
+        installButton.addEventListener('click', async () => {
+            if (!deferredPrompt) {
+                alert('Install not available. Try opening in a supported browser.');
+                return;
+            }
+            
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`PWA: User response: ${outcome}`);
+            
+            if (outcome === 'accepted') {
+                installButton.classList.remove('show');
+            }
+            
+            deferredPrompt = null;
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA: App installed successfully');
+            installButton.classList.remove('show');
+            deferredPrompt = null;
+        });
+
         // Register Service Worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -159,13 +218,91 @@
         }
 
         let score = 0;
-        let gameState = 'idle'; // 'idle', 'ready', 'dropping', 'pulling', 'game_over'
+        let gameState = 'idle';
         let hookMovingUp = false;
         let ship, hook, entities;
         let imagesLoaded = false;
         let shipImg, hookImg;
         let fishImages = [];
         let trashImages = [];
+        let lanes = []; // Track which lanes are occupied
+
+        // Default images as data URIs
+        const DEFAULT_IMAGES = {
+            fish: [
+                // Fish 1 - Orange fish
+                'data:image/svg+xml,' + encodeURIComponent(`
+                    <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                        <ellipse cx="35" cy="30" rx="20" ry="15" fill="#FF8C42"/>
+                        <circle cx="40" cy="25" r="3" fill="white"/>
+                        <circle cx="41" cy="25" r="1.5" fill="black"/>
+                        <path d="M 15 30 L 5 20 L 5 40 Z" fill="#FF6B35"/>
+                    </svg>
+                `),
+                // Fish 2 - Blue fish
+                'data:image/svg+xml,' + encodeURIComponent(`
+                    <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                        <ellipse cx="35" cy="30" rx="22" ry="16" fill="#4A90E2"/>
+                        <circle cx="42" cy="26" r="3" fill="white"/>
+                        <circle cx="43" cy="26" r="1.5" fill="black"/>
+                        <path d="M 13 30 L 3 18 L 3 42 Z" fill="#357ABD"/>
+                        <ellipse cx="35" cy="22" rx="5" ry="3" fill="#5BA3F5"/>
+                    </svg>
+                `),
+                // Fish 3 - Green fish
+                'data:image/svg+xml,' + encodeURIComponent(`
+                    <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                        <ellipse cx="35" cy="30" rx="18" ry="14" fill="#6BCF7F"/>
+                        <circle cx="39" cy="27" r="3" fill="white"/>
+                        <circle cx="40" cy="27" r="1.5" fill="black"/>
+                        <path d="M 17 30 L 7 22 L 7 38 Z" fill="#4CAF50"/>
+                        <circle cx="30" cy="25" r="2" fill="#81E89E"/>
+                    </svg>
+                `)
+            ],
+            trash: [
+                // Bottle 1 - Green bottle
+                'data:image/svg+xml,' + encodeURIComponent(`
+                    <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="22" y="12" width="16" height="8" rx="2" fill="#8B4513"/>
+                        <rect x="20" y="20" width="20" height="28" rx="3" fill="#90EE90" opacity="0.7"/>
+                        <rect x="22" y="23" width="16" height="3" fill="#228B22"/>
+                        <ellipse cx="30" cy="35" rx="7" ry="5" fill="white" opacity="0.3"/>
+                    </svg>
+                `),
+                // Bottle 2 - Blue bottle
+                'data:image/svg+xml,' + encodeURIComponent(`
+                    <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="22" y="10" width="16" height="9" rx="2" fill="#654321"/>
+                        <rect x="20" y="19" width="20" height="30" rx="3" fill="#87CEEB" opacity="0.7"/>
+                        <rect x="22" y="22" width="16" height="3" fill="#4682B4"/>
+                        <ellipse cx="30" cy="36" rx="7" ry="5" fill="white" opacity="0.3"/>
+                    </svg>
+                `),
+                // Bottle 3 - Brown bottle
+                'data:image/svg+xml,' + encodeURIComponent(`
+                    <svg width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="22" y="11" width="16" height="8" rx="2" fill="#8B4513"/>
+                        <rect x="20" y="19" width="20" height="29" rx="3" fill="#8B4513" opacity="0.6"/>
+                        <rect x="22" y="22" width="16" height="3" fill="#654321"/>
+                        <ellipse cx="30" cy="35" rx="7" ry="5" fill="white" opacity="0.2"/>
+                    </svg>
+                `)
+            ],
+            ship: 'data:image/svg+xml,' + encodeURIComponent(`
+                <svg width="80" height="40" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M 10 30 L 20 10 L 60 10 L 70 30 Z" fill="#8B4513"/>
+                    <rect x="15" y="12" width="50" height="8" fill="#D2691E"/>
+                    <rect x="35" y="5" width="10" height="7" fill="#654321"/>
+                </svg>
+            `),
+            hook: 'data:image/svg+xml,' + encodeURIComponent(`
+                <svg width="30" height="30" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="15" cy="10" r="3" fill="#C0C0C0"/>
+                    <path d="M 15 13 Q 15 20 10 23 Q 8 24 8 26 Q 8 28 10 28 Q 15 28 15 23" stroke="#C0C0C0" stroke-width="2" fill="none"/>
+                </svg>
+            `)
+        };
 
         // Login handling
         const handleLogin = () => {
@@ -181,14 +318,13 @@
             }
         };
 
-        // Allow Enter key to submit login
         document.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !loginScreen.classList.contains('hidden')) {
                 handleLogin();
             }
         });
 
-        // Image configuration - list all your images here
+        // Image configuration
         const IMAGE_CONFIG = {
             ship: 'statics/ship.png',
             hook: 'statics/hook.png',
@@ -208,7 +344,7 @@
             ]
         };
 
-        // Load images with progress tracking
+        // Load images with fallback to default images
         const loadImages = () => {
             return new Promise(async (resolve) => {
                 let loadedCount = 0;
@@ -220,81 +356,130 @@
                     loadingInfo.textContent = `Loading: ${loadedCount} / ${totalImages} assets`;
                 };
 
-                // Load ship
+                // Load ship with fallback
                 shipImg = new Image();
                 const shipPromise = new Promise((res) => {
+                    let imageLoaded = false;
+                    
                     shipImg.onload = () => {
-                        loadedCount++;
-                        console.log('✓ Loaded: ship.png');
-                        updateProgress();
-                        res();
+                        if (!imageLoaded) {
+                            imageLoaded = true;
+                            loadedCount++;
+                            console.log('✓ Loaded: ship.png');
+                            updateProgress();
+                            res();
+                        }
                     };
                     shipImg.onerror = () => {
-                        console.error('✗ Failed to load: ship.png');
-                        loadedCount++;
-                        updateProgress();
-                        res();
+                        if (!imageLoaded) {
+                            imageLoaded = true;
+                            console.log('⚠ Using default ship image (file not found in statics/)');
+                            shipImg.src = DEFAULT_IMAGES.ship;
+                            // Wait for default image to load
+                            setTimeout(() => {
+                                loadedCount++;
+                                updateProgress();
+                                res();
+                            }, 100);
+                        }
                     };
                 });
                 shipImg.src = IMAGE_CONFIG.ship;
 
-                // Load hook
+                // Load hook with fallback
                 hookImg = new Image();
                 const hookPromise = new Promise((res) => {
+                    let imageLoaded = false;
+                    
                     hookImg.onload = () => {
-                        loadedCount++;
-                        console.log('✓ Loaded: hook.png');
-                        updateProgress();
-                        res();
+                        if (!imageLoaded) {
+                            imageLoaded = true;
+                            loadedCount++;
+                            console.log('✓ Loaded: hook.png');
+                            updateProgress();
+                            res();
+                        }
                     };
                     hookImg.onerror = () => {
-                        console.error('✗ Failed to load: hook.png');
-                        loadedCount++;
-                        updateProgress();
-                        res();
+                        if (!imageLoaded) {
+                            imageLoaded = true;
+                            console.log('⚠ Using default hook image (file not found in statics/)');
+                            hookImg.src = DEFAULT_IMAGES.hook;
+                            setTimeout(() => {
+                                loadedCount++;
+                                updateProgress();
+                                res();
+                            }, 100);
+                        }
                     };
                 });
                 hookImg.src = IMAGE_CONFIG.hook;
 
                 await Promise.all([shipPromise, hookPromise]);
 
-                // Load fish images
+                // Load fish images with fallback
                 const fishPromises = IMAGE_CONFIG.fishes.map((src, index) => {
                     return new Promise((res) => {
+                        let imageLoaded = false;
                         const img = new Image();
+                        
                         img.onload = () => {
-                            fishImages.push(img);
-                            loadedCount++;
-                            console.log(`✓ Loaded: ${src}`);
-                            updateProgress();
-                            res();
+                            if (!imageLoaded) {
+                                imageLoaded = true;
+                                fishImages.push(img);
+                                loadedCount++;
+                                console.log(`✓ Loaded: ${src}`);
+                                updateProgress();
+                                res();
+                            }
                         };
                         img.onerror = () => {
-                            console.error(`✗ Failed to load: ${src}`);
-                            loadedCount++;
-                            updateProgress();
-                            res();
+                            if (!imageLoaded) {
+                                imageLoaded = true;
+                                console.log(`⚠ Using default fish image ${index + 1} (file not found in statics/fishes/)`);
+                                const defaultImg = new Image();
+                                defaultImg.src = DEFAULT_IMAGES.fish[index % DEFAULT_IMAGES.fish.length];
+                                fishImages.push(defaultImg);
+                                setTimeout(() => {
+                                    loadedCount++;
+                                    updateProgress();
+                                    res();
+                                }, 100);
+                            }
                         };
                         img.src = src;
                     });
                 });
 
-                // Load trash images
+                // Load trash images with fallback
                 const trashPromises = IMAGE_CONFIG.trashes.map((src, index) => {
                     return new Promise((res) => {
+                        let imageLoaded = false;
                         const img = new Image();
+                        
                         img.onload = () => {
-                            trashImages.push(img);
-                            loadedCount++;
-                            console.log(`✓ Loaded: ${src}`);
-                            updateProgress();
-                            res();
+                            if (!imageLoaded) {
+                                imageLoaded = true;
+                                trashImages.push(img);
+                                loadedCount++;
+                                console.log(`✓ Loaded: ${src}`);
+                                updateProgress();
+                                res();
+                            }
                         };
                         img.onerror = () => {
-                            console.error(`✗ Failed to load: ${src}`);
-                            loadedCount++;
-                            updateProgress();
-                            res();
+                            if (!imageLoaded) {
+                                imageLoaded = true;
+                                console.log(`⚠ Using default trash image ${index + 1} (file not found in statics/trashes/)`);
+                                const defaultImg = new Image();
+                                defaultImg.src = DEFAULT_IMAGES.trash[index % DEFAULT_IMAGES.trash.length];
+                                trashImages.push(defaultImg);
+                                setTimeout(() => {
+                                    loadedCount++;
+                                    updateProgress();
+                                    res();
+                                }, 100);
+                            }
                         };
                         img.src = src;
                     });
@@ -304,10 +489,6 @@
 
                 console.log(`Loaded ${fishImages.length} fish images`);
                 console.log(`Loaded ${trashImages.length} trash images`);
-
-                if (fishImages.length === 0 || trashImages.length === 0) {
-                    errorMessage.textContent = `Warning: Found ${fishImages.length} fish and ${trashImages.length} trash images.`;
-                }
 
                 progressBar.style.width = '100%';
                 loadingInfo.textContent = `Ready! ${fishImages.length} fish, ${trashImages.length} trash`;
@@ -326,15 +507,15 @@
             canvas.height = window.innerHeight;
         };
 
-        const getEntitySize = () => Math.max(30, 60 - score * 2); // Smaller as score increases
+        const getEntitySize = () => Math.max(30, 60 - score * 2);
         const getHookSize = () => getEntitySize() * 0.4;
-        const getEntitySpeed = () => 2 + score * 0.3; // Faster as score increases
-        const getTrashCount = () => Math.max(2, 10 - score); // Less trash as score increases
-        const getFishCount = () => 5 + score; // More fish as score increases
+        const getEntitySpeed = () => 2 + score * 0.3;
+        const getTrashCount = () => Math.max(2, 10 - score);
+        const getFishCount = () => 5 + score;
 
         const resetGame = () => {
             score = 0;
-            gameState = 'ready'; // Start in ready state
+            gameState = 'ready';
             hookMovingUp = false;
 
             ship = {
@@ -350,7 +531,7 @@
                 y: ship.y + ship.height,
                 width: getHookSize(),
                 height: getHookSize(),
-                speed: 0.8, // Slower falling speed
+                speed: 0.8,
                 attached: null
             };
 
@@ -362,7 +543,6 @@
             const trashCount = getTrashCount();
             const fishCount = getFishCount();
             
-            // Remove excess or add entities
             entities = entities.filter(e => {
                 if (e.type === 'trash') {
                     return entities.filter(en => en.type === 'trash').indexOf(e) < trashCount;
@@ -382,25 +562,41 @@
             }
         };
 
-        const createEntity = (type) => {
+        const createEntity = (type, forcePosition = null, laneY = null, laneHeight = null, laneIndex = null) => {
             const size = getEntitySize();
             const imageArray = type === 'fish' ? fishImages : trashImages;
             const imageIndex = imageArray.length > 0 ? Math.floor(Math.random() * imageArray.length) : 0;
+            
+            let x, direction;
+            if (forcePosition) {
+                x = forcePosition.x;
+                direction = forcePosition.direction;
+            } else {
+                // Randomly spawn from left or right side
+                direction = Math.random() > 0.5 ? 1 : -1;
+                x = direction === 1 ? -size : canvas.width + size;
+            }
+            
+            // Use provided lane or calculate random position
+            const y = laneY !== null ? laneY + (laneHeight - size) / 2 : canvas.height * 0.4 + Math.random() * (canvas.height * 0.6 - size);
+            
             return {
-                x: Math.random() * canvas.width,
-                y: canvas.height * 0.4 + Math.random() * (canvas.height * 0.6 - size),
+                x: x,
+                y: y,
                 width: size,
                 height: size,
-                speed: (Math.random() * 0.5 + 0.5) * getEntitySpeed(),
-                direction: Math.random() > 0.5 ? 1 : -1,
+                speed: (Math.random() * 1 + 1.5) * getEntitySpeed(), // Varied speed
+                direction: direction,
                 type: type,
-                imageIndex: imageIndex
+                imageIndex: imageIndex,
+                lane: laneY,
+                laneHeight: laneHeight,
+                laneIndex: laneIndex
             };
         };
 
         const handleInput = (e) => {
             if (gameState === 'ready' || gameState === 'dropping' || gameState === 'pulling') {
-                // Ship movement (only in ready state)
                 if (gameState === 'ready') {
                     if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
                         ship.x -= ship.speed;
@@ -410,12 +606,10 @@
                     ship.x = Math.max(ship.width / 2, Math.min(canvas.width - ship.width / 2, ship.x));
                 }
                 
-                // Start dropping hook
                 if (gameState === 'ready' && (e.key === 'ArrowDown' || e.key.toLowerCase() === 's')) {
                     gameState = 'dropping';
                 }
                 
-                // Pull hook up
                 if ((gameState === 'dropping' || gameState === 'pulling') && (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w')) {
                     hookMovingUp = true;
                     gameState = 'pulling';
@@ -430,7 +624,6 @@
         const handleKeyUp = (e) => {
             if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') {
                 hookMovingUp = false;
-                // If hook is not attached and was pulling, go back to dropping
                 if (gameState === 'pulling' && !hook.attached) {
                     gameState = 'dropping';
                 }
@@ -447,96 +640,86 @@
         const update = () => {
             if (gameState === 'idle' || gameState === 'game_over') return;
 
-            // In ready state: hook stays with ship
             if (gameState === 'ready') {
                 hook.x = ship.x;
                 hook.y = ship.y + ship.height;
                 
-                // Update entity movement
                 entities.forEach(entity => {
                     entity.x += entity.speed * entity.direction;
-                    if (entity.x <= 0 || entity.x + entity.width >= canvas.width) {
-                        entity.direction *= -1;
+                    
+                    // Check if entity went off screen
+                    if ((entity.direction === 1 && entity.x > canvas.width + entity.width) ||
+                        (entity.direction === -1 && entity.x < -entity.width)) {
+                        // Respawn from opposite side in the same lane
+                        const newDirection = Math.random() > 0.5 ? 1 : -1;
+                        entity.x = newDirection === 1 ? -entity.width : canvas.width + entity.width;
+                        entity.direction = newDirection;
+                        entity.speed = (Math.random() * 0.5 + 0.5) * getEntitySpeed();
+                        entity.imageIndex = Math.floor(Math.random() * (entity.type === 'fish' ? fishImages : trashImages).length);
                     }
                 });
                 return;
             }
 
-            // Hook follows ship horizontally only in ready state
-            if (gameState === 'ready') {
-                hook.x = ship.x;
-            }
-
-            // Hook movement
             if (gameState === 'pulling' || (gameState === 'pulling' && hook.attached)) {
-                // Move up when pulling or when attached to something
                 hook.y -= hook.speed * 3;
                 
-                // Move attached entity with hook (ABOVE the hook so it can touch ship)
                 if (hook.attached) {
                     hook.attached.x = hook.x - hook.attached.width / 2;
-                    hook.attached.y = hook.y - hook.attached.height; // Position above hook
+                    hook.attached.y = hook.y - hook.attached.height;
                 }
                 
-                // When hook reaches ship
                 if (hook.y <= ship.y + ship.height) {
                     hook.y = ship.y + ship.height;
                     
-                    // If nothing attached, go back to ready state
                     if (!hook.attached) {
                         gameState = 'ready';
                         hookMovingUp = false;
                     }
                 }
             } else if (gameState === 'dropping') {
-                // Always falling down when in dropping state
                 hook.y += hook.speed;
                 if (hook.y > canvas.height) {
                     hook.y = canvas.height;
                 }
             }
 
-            // Entity movement
             entities.forEach(entity => {
-                // Skip moving attached entity
                 if (entity === hook.attached) return;
                 
                 entity.x += entity.speed * entity.direction;
-                if (entity.x <= 0 || entity.x + entity.width >= canvas.width) {
-                    entity.direction *= -1;
-                }
                 
-                // Update entity size based on score
-                const newSize = getEntitySize();
-                entity.width = newSize;
-                entity.height = newSize;
-                entity.speed = (Math.random() * 0.5 + 0.5) * getEntitySpeed();
+                // Check if entity went off screen
+                if ((entity.direction === 1 && entity.x > canvas.width + entity.width) ||
+                    (entity.direction === -1 && entity.x < -entity.width)) {
+                    // Respawn from opposite side in the same lane
+                    const newDirection = Math.random() > 0.5 ? 1 : -1;
+                    entity.x = newDirection === 1 ? -entity.width : canvas.width + entity.width;
+                    entity.direction = newDirection;
+                    entity.speed = (Math.random() * 0.5 + 0.5) * getEntitySpeed();
+                    entity.imageIndex = Math.floor(Math.random() * (entity.type === 'fish' ? fishImages : trashImages).length);
+                }
             });
 
-            // Check if attached entity touches ship
             if (hook.attached) {
                 if (checkCollision(hook.attached, ship)) {
                     if (hook.attached.type === 'trash') {
-                        // Trash touched ship - score increases
                         score++;
                         entities = entities.filter(e => e !== hook.attached);
                         hook.attached = null;
-                        gameState = 'ready'; // Back to ready state
+                        gameState = 'ready';
                         hookMovingUp = false;
                         updateEntities();
                     } else if (hook.attached.type === 'fish') {
-                        // Fish touched ship - game over
                         gameState = 'game_over';
                         return;
                     }
                 }
             }
 
-            // Check collisions with hook (only if not already attached)
             if (!hook.attached && (gameState === 'dropping' || gameState === 'pulling')) {
                 for (const entity of entities) {
                     if (checkCollision(hook, entity)) {
-                        // Hook catches the entity - attach it and start pulling
                         hook.attached = entity;
                         gameState = 'pulling';
                         break;
@@ -546,7 +729,6 @@
         };
 
         const draw = () => {
-            // Background
             ctx.fillStyle = '#87CEEB';
             ctx.fillRect(0, 0, canvas.width, canvas.height * 0.4);
             ctx.fillStyle = '#008080';
@@ -554,7 +736,6 @@
 
             if (gameState === 'idle') return;
 
-            // Hook line
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -562,7 +743,6 @@
             ctx.lineTo(hook.x, hook.y);
             ctx.stroke();
 
-            // Ship
             if (shipImg.complete && shipImg.naturalHeight !== 0) {
                 ctx.drawImage(shipImg, ship.x - ship.width / 2, ship.y - ship.height / 2, ship.width, ship.height);
             } else {
@@ -570,7 +750,6 @@
                 ctx.fillRect(ship.x - ship.width / 2, ship.y - ship.height / 2, ship.width, ship.height);
             }
 
-            // Hook
             const hookSize = getHookSize();
             hook.width = hookSize;
             hook.height = hookSize;
@@ -583,18 +762,36 @@
                 ctx.fill();
             }
 
-            // Entities
             entities.forEach(entity => {
                 const img = entity.type === 'fish' ? fishImages[entity.imageIndex] : trashImages[entity.imageIndex];
-                if (img && img.complete && img.naturalHeight !== 0) {
-                    ctx.drawImage(img, entity.x, entity.y, entity.width, entity.height);
+                
+                // Save context and apply transformations for flipping
+                ctx.save();
+                
+                if (entity.direction === -1) {
+                    // Flip horizontally when moving left
+                    ctx.translate(entity.x + entity.width, entity.y);
+                    ctx.scale(-1, 1);
+                    
+                    if (img && img.complete && img.naturalHeight !== 0) {
+                        ctx.drawImage(img, 0, 0, entity.width, entity.height);
+                    } else {
+                        ctx.fillStyle = entity.type === 'fish' ? '#FF6347' : '#808080';
+                        ctx.fillRect(0, 0, entity.width, entity.height);
+                    }
                 } else {
-                    ctx.fillStyle = entity.type === 'fish' ? '#FF6347' : '#808080';
-                    ctx.fillRect(entity.x, entity.y, entity.width, entity.height);
+                    // Normal orientation when moving right
+                    if (img && img.complete && img.naturalHeight !== 0) {
+                        ctx.drawImage(img, entity.x, entity.y, entity.width, entity.height);
+                    } else {
+                        ctx.fillStyle = entity.type === 'fish' ? '#FF6347' : '#808080';
+                        ctx.fillRect(entity.x, entity.y, entity.width, entity.height);
+                    }
                 }
+                
+                ctx.restore();
             });
 
-            // Score and instructions
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 24px Arial';
             ctx.fillText(`Score: ${score}`, 10, 30);
@@ -636,7 +833,6 @@
         window.addEventListener('keydown', handleInput);
         window.addEventListener('keyup', handleKeyUp);
 
-        // Initialize game with loading screen
         loadImages();
     </script>
 </body>
