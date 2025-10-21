@@ -70,10 +70,12 @@ let trashImages = [];
 let currentGuideStep = 1;
 
 // Touch controls
+let lastTap = 0;
 let touchStartX = 0;
 let touchStartY = 0;
 let isTouching = false;
 let touchStartTime = 0;
+let hasMoved = false;
 
 // Detect if mobile device
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
@@ -593,6 +595,7 @@ canvas.addEventListener('touchstart', (e) => {
     touchStartY = touch.clientY - rect.top;
     isTouching = true;
     touchStartTime = Date.now();
+    hasMoved = false;
     
     // Check if restart button was clicked in game over state
     if (gameState === 'game_over' && window.restartButton) {
@@ -604,9 +607,18 @@ canvas.addEventListener('touchstart', (e) => {
         }
     }
     
-    // Single tap detection for dropping hook
-    if (gameState === 'ready') {
-        gameState = 'dropping';
+    // Double tap detection for dropping hook
+    const currentTime = Date.now();
+    const tapGap = currentTime - lastTap;
+    
+    if (tapGap < 300 && tapGap > 0 && !hasMoved) {
+        // Double tap detected - drop hook
+        if (gameState === 'ready') {
+            gameState = 'dropping';
+        }
+        lastTap = 0;
+    } else {
+        lastTap = currentTime;
     }
 }, { passive: false });
 
@@ -620,18 +632,22 @@ canvas.addEventListener('touchmove', (e) => {
     const currentX = touch.clientX - rect.left;
     const currentY = touch.clientY - rect.top;
     
-    if (gameState === 'ready') {
-        const deltaX = currentX - touchStartX;
-        
-        if (Math.abs(deltaX) > 5) {
-            if (deltaX > 0) {
-                ship.x += ship.speed;
-            } else {
-                ship.x -= ship.speed;
-            }
-            ship.x = Math.max(ship.width / 2, Math.min(canvas.width - ship.width / 2, ship.x));
-            touchStartX = currentX;
+    const deltaX = currentX - touchStartX;
+    const deltaY = currentY - touchStartY;
+    
+    // Mark as moved if significant movement detected
+    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+        hasMoved = true;
+    }
+    
+    if (gameState === 'ready' && Math.abs(deltaX) > 5) {
+        if (deltaX > 0) {
+            ship.x += ship.speed;
+        } else {
+            ship.x -= ship.speed;
         }
+        ship.x = Math.max(ship.width / 2, Math.min(canvas.width - ship.width / 2, ship.x));
+        touchStartX = currentX;
     }
 }, { passive: false });
 
