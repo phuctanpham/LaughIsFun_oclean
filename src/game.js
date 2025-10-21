@@ -54,6 +54,7 @@ const ctx = canvas.getContext('2d');
 const loadingScreen = document.getElementById('loadingScreen');
 const menuScreen = document.getElementById('menuScreen');
 const guideScreen = document.getElementById('guideScreen');
+const hintOverlay = document.getElementById('hintOverlay');
 const progressBar = document.getElementById('progressBar');
 const loadingInfo = document.getElementById('loadingInfo');
 const errorMessage = document.getElementById('errorMessage');
@@ -69,11 +70,15 @@ let trashImages = [];
 let currentGuideStep = 1;
 
 // Touch controls
-let lastTap = 0;
 let touchStartX = 0;
 let touchStartY = 0;
 let isTouching = false;
 let touchStartTime = 0;
+
+// Detect if mobile device
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                 ('ontouchstart' in window) || 
+                 (navigator.maxTouchPoints > 0);
 
 // Default SVG images
 const DEFAULT_IMAGES = {
@@ -121,6 +126,16 @@ function closeGuide() {
 function startGameFromMenu() {
     menuScreen.classList.add('hidden');
     startGame();
+}
+
+// Show hint for mobile devices
+function showMobileHint() {
+    if (isMobile) {
+        hintOverlay.classList.remove('hidden');
+        setTimeout(() => {
+            hintOverlay.classList.add('hidden');
+        }, 1500);
+    }
 }
 
 // Image Loading Functions
@@ -245,7 +260,6 @@ const setupCanvas = () => {
 
 const getEntitySize = () => Math.max(30, 60 - score * 2);
 const getHookSize = () => getEntitySize() * 0.4;
-// REDUCED initial speed, increases with score
 const getEntitySpeed = () => Math.max(0.5, 1 + score * 0.2);
 const getTrashCount = () => Math.max(2, 10 - score);
 const getFishCount = () => 5 + score;
@@ -274,6 +288,9 @@ const resetGame = () => {
 
     entities = [];
     updateEntities();
+    
+    // Show mobile hint when game starts
+    showMobileHint();
 };
 
 const updateEntities = () => {
@@ -385,7 +402,6 @@ const update = () => {
     }
 
     if (gameState === 'pulling') {
-        // REDUCED pull speed to match drop speed
         hook.y -= hook.speed;
         
         if (hook.attached) {
@@ -479,18 +495,15 @@ const draw = () => {
         ctx.save();
         ctx.translate(entity.x + entity.width / 2, entity.y + entity.height / 2);
         
-        // Trash tilted at 30 degrees
         if (entity.type === 'trash') {
             ctx.rotate(30 * Math.PI / 180);
         }
         
-        // Fish swim in opposite direction of image (flip horizontally)
         if (entity.type === 'fish') {
             if (entity.direction === 1) {
                 ctx.scale(-1, 1);
             }
         } else {
-            // Trash moves normally (not flipped)
             if (entity.direction === -1) {
                 ctx.scale(-1, 1);
             }
@@ -520,11 +533,39 @@ const draw = () => {
         ctx.fillStyle = '#fff';
         ctx.font = '48px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
+        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 60);
         ctx.font = '24px Arial';
-        ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2);
-        ctx.fillText('Press Enter to Restart', canvas.width / 2, canvas.height / 2 + 40);
+        ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 - 10);
+        
+        // Draw Restart Button
+        const buttonWidth = 200;
+        const buttonHeight = 50;
+        const buttonX = canvas.width / 2 - buttonWidth / 2;
+        const buttonY = canvas.height / 2 + 30;
+        
+        // Button background
+        ctx.fillStyle = '#667eea';
+        ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        
+        // Button border
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        
+        // Button text
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText('RESTART', canvas.width / 2, buttonY + 32);
+        
         ctx.textAlign = 'left';
+        
+        // Store button position for click detection
+        window.restartButton = {
+            x: buttonX,
+            y: buttonY,
+            width: buttonWidth,
+            height: buttonHeight
+        };
     }
 };
 
@@ -541,12 +582,10 @@ const startGame = () => {
 };
 
 // Mobile Touch Controls
-let doubleTapTimeout = null;
-
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     
-    if (gameState === 'idle' || gameState === 'game_over') return;
+    if (gameState === 'idle') return;
     
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
@@ -555,18 +594,19 @@ canvas.addEventListener('touchstart', (e) => {
     isTouching = true;
     touchStartTime = Date.now();
     
-    // Double tap detection for dropping hook
-    const currentTime = Date.now();
-    const tapGap = currentTime - lastTap;
-    
-    if (tapGap < 300 && tapGap > 0) {
-        // Double tap detected - drop hook
-        if (gameState === 'ready') {
-            gameState = 'dropping';
+    // Check if restart button was clicked in game over state
+    if (gameState === 'game_over' && window.restartButton) {
+        const btn = window.restartButton;
+        if (touchStartX >= btn.x && touchStartX <= btn.x + btn.width &&
+            touchStartY >= btn.y && touchStartY <= btn.y + btn.height) {
+            resetGame();
+            return;
         }
-        lastTap = 0;
-    } else {
-        lastTap = currentTime;
+    }
+    
+    // Single tap detection for dropping hook
+    if (gameState === 'ready') {
+        gameState = 'dropping';
     }
 }, { passive: false });
 
@@ -580,12 +620,10 @@ canvas.addEventListener('touchmove', (e) => {
     const currentX = touch.clientX - rect.left;
     const currentY = touch.clientY - rect.top;
     
-    // Swipe detection for moving ship
     if (gameState === 'ready') {
         const deltaX = currentX - touchStartX;
         
         if (Math.abs(deltaX) > 5) {
-            // Move ship based on swipe direction
             if (deltaX > 0) {
                 ship.x += ship.speed;
             } else {
@@ -602,18 +640,31 @@ canvas.addEventListener('touchend', (e) => {
     
     isTouching = false;
     
-    // If touching ended during pulling without attachment, return to dropping
     if (gameState === 'pulling' && !hook.attached) {
         gameState = 'dropping';
     }
 }, { passive: false });
+
+// Click event for restart button (desktop)
+canvas.addEventListener('click', (e) => {
+    if (gameState === 'game_over' && window.restartButton) {
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        const btn = window.restartButton;
+        
+        if (clickX >= btn.x && clickX <= btn.x + btn.width &&
+            clickY >= btn.y && clickY <= btn.y + btn.height) {
+            resetGame();
+        }
+    }
+});
 
 // Continuous touch detection for pulling hook
 setInterval(() => {
     if (isTouching && (gameState === 'dropping' || gameState === 'pulling')) {
         const touchDuration = Date.now() - touchStartTime;
         
-        // If held for more than 300ms, start pulling
         if (touchDuration > 300) {
             hookMovingUp = true;
             gameState = 'pulling';
@@ -623,14 +674,12 @@ setInterval(() => {
     }
 }, 50);
 
-// Prevent default touch behaviors for mobile
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 window.addEventListener('resize', setupCanvas);
 window.addEventListener('keydown', handleInput);
 window.addEventListener('keyup', handleKeyUp);
 
-// Prevent scrolling on mobile
 document.body.addEventListener('touchmove', (e) => {
     e.preventDefault();
 }, { passive: false });
